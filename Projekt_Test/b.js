@@ -1,111 +1,517 @@
-const canvas = document.getElementById("canvas");
-// Initialize the GL context
-const gl = canvas.getContext("webgl2");
+////////////////////////////////////////////////////////////////////////////////
+// START OF BOILERPLATE CODE ///////////////////////////////////////////////////
 
-const vertexShaderSource = `
-	attribute vec4 vertexPos;
-    attribute vec3 vertexColor; // Added color attribute
-    varying vec4 v_color;
-	void main() {
-	    gl_Position = vertexPos;
-        v_color = vec4(vertexColor, 1.0);
-	}
-`
+console.log('Hello, WebGL!');
 
-const fragmentShaderSource = `
-    precision mediump float;
-    varying vec4 v_color;
+// Get the WebGL context
+const canvas = document.getElementById('canvas');
+const gl = canvas.getContext('webgl2');
+
+// Add mouse move event handlers to the canvas to update the cursor[] array.
+const cursor = [0, 0];
+canvas.addEventListener('mousemove', (event) =>
+{
+    cursor[0] = (event.offsetX / canvas.width) * 2 - 1;
+    cursor[1] = (event.offsetY / canvas.height) * -2 + 1;
+});
+
+function onMouseDrag(callback)
+{
+    canvas.addEventListener('pointerdown', () =>
+    {
+        const stopDrag = () =>
+        {
+            canvas.removeEventListener("pointermove", callback);
+            canvas.removeEventListener("pointerup", stopDrag);
+            canvas.removeEventListener("pointerleave", stopDrag);
+        };
+
+        canvas.addEventListener('pointermove', callback);
+        canvas.addEventListener("pointerup", stopDrag, { once: true });
+        canvas.addEventListener("pointerleave", stopDrag, { once: true });
+    });
+}
+
+function onMouseWheel(callback)
+{
+    canvas.addEventListener('wheel', callback);
+}
+
+function onKeyDown(callback)
+{
+    canvas.addEventListener('keydown', callback);
+}
+
+function onKeyUp(callback)
+{
+    canvas.addEventListener('keyup', callback);
+}
+
+// Basic render loop manager.
+function setRenderLoop(callback)
+{
+    function renderLoop(time)
+    {
+        if (setRenderLoop._callback !== null) {
+            setRenderLoop._callback(time);
+            requestAnimationFrame(renderLoop);
+        }
+    }
+    setRenderLoop._callback = callback;
+    requestAnimationFrame(renderLoop);
+}
+setRenderLoop._callback = null;
+
+import glance from './js/glance.js';
+
+// BOILERPLATE END
+////////////////////////////////////////////////////////////////////////////////
+
+const {
+    vec3,
+    mat3,
+    mat4,
+} = glance;
+
+
+// =============================================================================
+// Shader Code
+// =============================================================================
+
+
+const phongVertexShader = `#version 300 es
+    precision highp float;
+
+    uniform mat4 u_modelMatrix;
+    uniform mat4 u_viewMatrix;
+    uniform mat4 u_projectionMatrix;
+    uniform mat3 u_normalMatrix;
+
+    in vec3 a_pos;
+    in vec3 a_normal;
+    in vec2 a_texCoord;
+
+    out vec3 f_worldPos;
+    out vec3 f_normal;
+    out vec2 f_texCoord;
+
     void main() {
-		gl_FragColor = v_color;
-	}
-`
+        f_worldPos = vec3(u_modelMatrix * vec4(a_pos, 1.0));
+        f_normal = u_normalMatrix * a_normal;
+        f_texCoord = a_texCoord;
+        gl_Position = u_projectionMatrix * u_viewMatrix * u_modelMatrix * vec4(a_pos, 1.0);
+    }
+`;
 
-// Create the Vertex Shader
-const vertexShader = gl.createShader(gl.VERTEX_SHADER)
-gl.shaderSource(vertexShader, vertexShaderSource)
-gl.compileShader(vertexShader)
+const instancedPhongVertexShader = `#version 300 es
+    precision highp float;
 
-// Create the Fragment Shader
-const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER)
-gl.shaderSource(fragmentShader, fragmentShaderSource)
-gl.compileShader(fragmentShader)
+    uniform mat4 u_viewMatrix;
+    uniform mat4 u_projectionMatrix;
 
-// Link the two into a single Shader Program
-const shaderProgram = gl.createProgram()
-gl.attachShader(shaderProgram, vertexShader)
-gl.attachShader(shaderProgram, fragmentShader)
-gl.linkProgram(shaderProgram)
-gl.useProgram(shaderProgram)
+    in vec3 a_pos;
+    in vec3 a_normal;
+    in vec2 a_texCoord;
+    in mat4 a_modelMatrix;
+    in mat3 a_normalMatrix;
 
-//////////////////////// Daten
+    out vec3 f_worldPos;
+    out vec3 f_normal;
+    out vec2 f_texCoord;
 
-const vertices = new Float32Array([
-    -0.5, 0.0, 0.0, 1., 1., 0., // 0
-    -0.5, 0.5, 0.0, 1., 0., 0.,  // 1
-    -0.5, 0.0, 0.5, 1., 0., 0.,  // 2
-    -0.5, 0.5, -0.5, 1., 0., 0.,  // 3
+    void main() {
+        f_worldPos = vec3(a_modelMatrix * vec4(a_pos, 1.0));
+        f_normal = a_normalMatrix * a_normal;
+        f_texCoord = a_texCoord;
+        gl_Position = u_projectionMatrix * u_viewMatrix * a_modelMatrix * vec4(a_pos, 1.0);
+    }
+`;
 
-    0, 0.0, 0.0, 0., 0, 1.,  // 4
-    0, 0.5, 0.0, 0., 1., 1.,  // 5
-    0, 0.0, -0.5, 0., 1., 1.,  // 6
-    0, 0.5, -0.5, 0., 1., 1.,  // 7
+const phongFragmentShader = `#version 300 es
+    precision mediump float;
+
+    uniform float u_ambient;
+    uniform float u_specular;
+    uniform float u_shininess;
+    uniform vec3 u_lightPos;
+    uniform vec3 u_lightColor;
+    uniform vec3 u_viewPos;
+    uniform sampler2D u_texAmbient;
+    uniform sampler2D u_texDiffuse;
+    uniform sampler2D u_texSpecular;
+
+    in vec3 f_worldPos;
+    in vec3 f_normal;
+    in vec2 f_texCoord;
+
+    out vec4 FragColor;
+
+    void main() {
+
+        // texture
+        vec3 texAmbient = texture(u_texAmbient, f_texCoord).rgb;
+        vec3 texDiffuse = texture(u_texDiffuse, f_texCoord).rgb;
+        vec3 texSpecular = texture(u_texSpecular, f_texCoord).rgb;
+
+        // ambient
+        vec3 ambient = max(vec3(u_ambient), texAmbient) * texDiffuse;
+
+        // diffuse
+        vec3 normal = normalize(f_normal);
+        vec3 lightDir = normalize(u_lightPos - f_worldPos);
+        float diffuseIntensity = max(dot(normal, lightDir), 0.0);
+        vec3 diffuse = diffuseIntensity * u_lightColor * texDiffuse;
+
+        // specular
+        vec3 viewDir = normalize(u_viewPos - f_worldPos);
+        vec3 halfWay = normalize(lightDir + viewDir);
+        float specularIntensity = pow(max(dot(normal, halfWay), 0.0), u_shininess);
+        vec3 specular = (u_specular * specularIntensity) * texSpecular * u_lightColor;
+
+        // color
+        FragColor = vec4(ambient + diffuse + specular, 1.0);
+    }
+`;
+
+
+const skyVertexShader = `#version 300 es
+    precision highp float;
+
+    uniform mat3 u_viewRotationMatrix;
+    uniform mat4 u_projectionMatrix;
+
+    in vec3 a_pos;
+
+    out vec3 f_texCoord;
+
+    void main() {
+        // Use the local position of the vertex as texture coordinate.
+        f_texCoord = a_pos;
+
+        // By setting Z == W, we ensure that the vertex is projected onto the
+        // far plane, which is exactly what we want for the background.
+        vec4 ndcPos = u_projectionMatrix * inverse(mat4(u_viewRotationMatrix)) * vec4(a_pos, 1.0);
+        gl_Position = ndcPos.xyww;
+    }
+`;
+
+
+const skyFragmentShader = `#version 300 es
+    precision mediump float;
+
+    uniform samplerCube u_skybox;
+
+    in vec3 f_texCoord;
+
+    out vec4 FragColor;
+
+    void main() {
+        // The fragment color is simply the color of the skybox at the given
+        // texture coordinate (local coordinate) of the fragment on the cube.
+        FragColor = texture(u_skybox, f_texCoord);
+    }
+`;
+
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+const projectionMatrix = mat4.perspective(Math.PI / 4, 1, 0.1, 14);
+
+const rocketScale = 0.05;
+const rocketDistance = 1.5;
+const rocketSpeed = 0.0003;
+const rocketCount = 2200;
+
+// Earth -----------------------------------------------------------------------
+
+const phongShader = glance.buildShaderProgram(gl, "phong-shader", phongVertexShader, phongFragmentShader, {
+    u_ambient: 0.1,
+    u_specular: 0.6,
+    u_shininess: 64,
+    u_lightPos: [0, 0, 5],
+    u_lightColor: [1, 1, 1],
+    u_projectionMatrix: projectionMatrix,
+    u_texAmbient: 0,
+    u_texDiffuse: 1,
+    u_texSpecular: 2,
+});
+
+const earthIBO = glance.createIndexBuffer(gl, glance.createSphereIndices(64, 64));
+
+const earthABO = glance.createAttributeBuffer(gl, "earth-abo", glance.createSphereAttributes(.9, 64, 64), {
+    a_pos: { size: 3, type: gl.FLOAT },
+    a_normal: { size: 3, type: gl.FLOAT },
+    a_texCoord: { size: 2, type: gl.FLOAT },
+});
+
+const earthVAO = glance.createVAO(
+    gl,
+    "earth-vao",
+    earthIBO,
+    glance.buildAttributeMap(phongShader, earthABO)
+);
+const earthTextureAmbient = await glance.loadTextureNow(gl, "./img/Earth_Ambient.avif");
+const earthTextureDiffuse = await glance.loadTextureNow(gl, "./img/Earth_Diffuse.avif");
+const earthTextureSpecular = await glance.loadTextureNow(gl, "./img/Earth_Specular.avif");
+
+// Rockets ---------------------------------------------------------------------
+
+const rocketShader = glance.buildShaderProgram(gl, "rocket-shader", instancedPhongVertexShader, phongFragmentShader, {
+    u_ambient: 0.1,
+    u_specular: 0.6,
+    u_shininess: 64,
+    u_lightPos: [0, 0, 5],
+    u_lightColor: [1, 1, 1],
+    u_projectionMatrix: projectionMatrix,
+    u_texAmbient: 0,
+    u_texDiffuse: 1,
+    u_texSpecular: 2,
+});
+
+const { attributes: rocketAttr, indices: rocketIdx } = await glance.loadObj("./obj/rocket.obj");
+
+const rocketIBO = glance.createIndexBuffer(gl, rocketIdx);
+
+const rocketABO = glance.createAttributeBuffer(gl, "rocket-abo", rocketAttr, {
+    a_pos: { size: 3, type: gl.FLOAT },
+    a_texCoord: { size: 2, type: gl.FLOAT },
+    a_normal: { size: 3, type: gl.FLOAT },
+});
+
+const rocketInstanceAttributes = new Float32Array(rocketCount * 25); // 16 + 9
+const rocketIABO = glance.createAttributeBuffer(gl, "rocket-iabo", rocketInstanceAttributes, {
+    a_modelMatrix: { size: 4, width: 4, type: gl.FLOAT, divisor: 1 },
+    a_normalMatrix: { size: 3, width: 3, type: gl.FLOAT, divisor: 1 },
+});
+
+const rocketVAO = glance.createVAO(
+    gl,
+    "rocket-vao",
+    rocketIBO,
+    glance.combineAttributeMaps(
+        glance.buildAttributeMap(rocketShader, rocketABO),
+        glance.buildAttributeMap(rocketShader, rocketIABO),
+    ),
+);
+const rocketTextureAmbient = await glance.loadTextureNow(gl, "./img/Rocket_Ambient.avif");
+const rocketTextureDiffuse = await glance.loadTextureNow(gl, "./img/Rocket_Diffuse.avif");
+const rocketTextureSpecular = await glance.loadTextureNow(gl, "./img/Rocket_Specular.avif");
+
+function updateRocketInstanceAttributes(time)
+{
+    for (let i = 0; i < rocketCount; i++) {
+        const modelMatrix = mat4.multiply(
+            mat4.fromRotation(i * (Math.PI / rocketCount), [0, 1, 0]),
+            mat4.multiply(
+                mat4.multiply(
+                    mat4.fromRotation(i + rocketSpeed * time, [0, 0, -1]),
+                    mat4.fromTranslation([-rocketDistance, 0, 0]),
+                ),
+                mat4.fromScaling(rocketScale),
+            ),
+        );
+
+        const arrayOffset = i * 25;
+        rocketInstanceAttributes.set(modelMatrix, arrayOffset);
+        const normalMatrix = mat3.fromMat4(mat4.transpose(mat4.invert(modelMatrix)));
+        rocketInstanceAttributes.set(normalMatrix, arrayOffset + 16);
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, rocketIABO.glObject);
+    gl.bufferData(gl.ARRAY_BUFFER, rocketInstanceAttributes, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+}
+
+// Skybox ----------------------------------------------------------------------
+
+const skyShader = glance.buildShaderProgram(gl, "sky-shader", skyVertexShader, skyFragmentShader, {
+    u_projectionMatrix: projectionMatrix,
+    u_skybox: 0,
+});
+
+const skyIBO = glance.createIndexBuffer(gl, glance.createSkyBoxIndices());
+
+const skyABO = glance.createAttributeBuffer(gl, "sky-abo", glance.createSkyBoxAttributes(), {
+    a_pos: { size: 3, type: gl.FLOAT },
+});
+
+const skyVAO = glance.createVAO(gl, "sky-vao", skyIBO, glance.buildAttributeMap(skyShader, skyABO));
+
+const skyCubemap = await glance.loadCubemapNow(gl, "sky-texture", [
+    "./img/Skybox_Right.avif",
+    "./img/Skybox_Left.avif",
+    "./img/Skybox_Top.avif",
+    "./img/Skybox_Bottom.avif",
+    "./img/Skybox_Front.avif",
+    "./img/Skybox_Back.avif",
 ]);
 
-const vertexPositions = new Float32Array([
-	.5, 0.0, 0.0, 1., 0., 0.,  // 0
-	.5, .5, 0.0, 1., 0., 0.,  // 1
-	.5, .5, 0.5, 1., 0., 0.,  // 2
-    1., 1., +.5, 0., 1., 1.,  // 3
-    1., 1., +.5, 0., 1., 1.,  // 4
-    0., 1., +.5, 0., 1., 1.,  // 5
-])
 
-// Create the position buffer
-const positionBuffer = gl.createBuffer()
-gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer)
-gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW)
+// =============================================================================
+// Draw Calls
+// =============================================================================
 
 
-const faceIndices = new Uint16Array([
-    0, 1, 2
+// Scene State
+let viewDist = 4.5;
+let viewPan = 0;
+let viewTilt = 0;
+let panDelta = 0;
+let tiltDelta = 0;
+
+const viewRotationMatrix = new glance.Cached(
+    () =>
+        mat4.multiply(
+            mat4.fromRotation(viewPan, [0, 1, 0]),
+            mat4.fromRotation(viewTilt, [1, 0, 0]),
+        )
+);
+
+const viewMatrix = new glance.Cached(
+    () => mat4.multiply(
+        viewRotationMatrix.get(),
+        mat4.fromTranslation([0, 0, viewDist]),
+    ),
+    [viewRotationMatrix]
+);
+
+const earthModelMatrix = new glance.TimeSensitive(
+    (time) => mat4.multiply(mat4.identity(), mat4.fromRotation(0.0002 * time, [0, 1, 0]))
+);
+
+const earthDrawCall = glance.createDrawCall(
+    gl,
+    phongShader,
+    earthVAO,
+    {
+        uniforms: {
+            u_modelMatrix: (time) => earthModelMatrix.getAt(time),
+            u_normalMatrix: (time) => mat3.fromMat4(mat4.transpose(mat4.invert(earthModelMatrix.getAt(time)))),
+            u_viewMatrix: () => mat4.invert(viewMatrix.get()),
+            u_viewPos: () => vec3.transformMat4(vec3.zero(), viewMatrix.get()),
+        },
+        textures: [
+            [0, earthTextureAmbient],
+            [1, earthTextureDiffuse],
+            [2, earthTextureSpecular],
+        ],
+        cullFace: gl.BACK,
+        depthTest: gl.LESS,
+    }
+);
+
+const rocketDrawCall = glance.createDrawCall(
+    gl,
+    rocketShader,
+    rocketVAO,
+    {
+        uniforms: {
+            u_viewMatrix: () => mat4.invert(viewMatrix.get()),
+            u_viewPos: () => vec3.transformMat4(vec3.zero(), viewMatrix.get()),
+        },
+        textures: [
+            [0, rocketTextureAmbient],
+            [1, rocketTextureDiffuse],
+            [2, rocketTextureSpecular],
+        ],
+        cullFace: gl.BACK,
+        depthTest: gl.LESS,
+        instanceCount: rocketCount,
+    }
+);
+
+const skyDrawCall = glance.createDrawCall(
+    gl,
+    skyShader,
+    skyVAO,
+    {
+        uniforms: {
+            u_viewRotationMatrix: () => mat3.fromMat4(viewRotationMatrix.get()),
+        },
+        textures: [
+            [0, skyCubemap],
+        ],
+        cullFace: gl.NONE,
+        depthTest: gl.LEQUAL,
+    }
+);
 
 
-])
+// =============================================================================
+// System Integration
+// =============================================================================
 
-// Create the index buffer
-const indexBuffer = gl.createBuffer()
-gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer)
-gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, faceIndices, gl.STATIC_DRAW)
+let lastTime = 0;
+let deltas = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+let deltaPtr = 0;
+
+setRenderLoop((time) =>
+{
+    const deltaTime = time - lastTime;
+    lastTime = time;
+    deltas[deltaPtr] = deltaTime;
+    deltaPtr = (deltaPtr + 1) % deltas.length;
+    const avgDeltaTime = deltas.reduce((a, b) => a + b, 0) / deltas.length;
+    if (deltaPtr == 0) console.log(avgDeltaTime);
+
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    if (panDelta != 0 || tiltDelta != 0) {
+        viewPan += panDelta * .02;
+        viewTilt += tiltDelta * .02;
+        viewRotationMatrix.setDirty();
+    }
+
+    updateRocketInstanceAttributes(time);
+
+    glance.performDrawCall(gl, earthDrawCall, time);
+    glance.performDrawCall(gl, rocketDrawCall, time);
+    glance.performDrawCall(gl, skyDrawCall, time);
+});
+
+onMouseDrag((e) =>
+{
+    viewPan += e.movementX * -.01;
+    viewTilt += e.movementY * -.01;
+    viewRotationMatrix.setDirty();
+});
+
+onMouseWheel((e) =>
+{
+    viewDist = Math.max(1.5, Math.min(10, viewDist * (1 + Math.sign(e.deltaY) * 0.2)));
+    viewMatrix.setDirty();
+});
 
 
-// Map the contents of the buffer to the vertex shader
-const vertexAttribute = gl.getAttribLocation(shaderProgram, 'vertexPos')
-gl.enableVertexAttribArray(vertexAttribute)
-gl.vertexAttribPointer(
-	vertexAttribute,
-	3,        // numComponents
-	gl.FLOAT, // type
-	false,    // normalize
-	6 * Float32Array.BYTES_PER_ELEMENT,        // stride
-	0         // offset
-)
+onKeyDown((e) =>
+{
+    if (e.key == "ArrowLeft") {
+        panDelta = Math.max(panDelta - 1, -1);
+    }
+    if (e.key == "ArrowRight") {
+        panDelta = Math.min(panDelta + 1, 1);
+    }
+    if (e.key == "ArrowUp") {
+        tiltDelta = Math.max(tiltDelta - 1, -1);
+    }
+    if (e.key == "ArrowDown") {
+        tiltDelta = Math.min(tiltDelta + 1, 1);
+    }
+});
 
-const colorAttribute = gl.getAttribLocation(shaderProgram, "vertexColor");
-gl.enableVertexAttribArray(colorAttribute);
-gl.vertexAttribPointer(
-    colorAttribute,
-    3,
-    gl.FLOAT,
-    false,
-    6 * Float32Array.BYTES_PER_ELEMENT,
-    3 * Float32Array.BYTES_PER_ELEMENT);
-
-    gl.disable(gl.CULL_FACE);
-
-/// Draw the scene.
-gl.drawElements(
-    gl.TRIANGLES,       // primitive type
-    faceIndices.length,                  // vertex count
-    gl.UNSIGNED_SHORT,  // type of indices
-    0                   // offset
-)
+onKeyUp((e) =>
+{
+    if (e.key == "ArrowLeft") {
+        panDelta = Math.min(panDelta + 1, 1);
+    }
+    if (e.key == "ArrowRight") {
+        panDelta = Math.max(panDelta - 1, -1);
+    }
+    if (e.key == "ArrowUp") {
+        tiltDelta = Math.min(tiltDelta + 1, 1);
+    }
+    if (e.key == "ArrowDown") {
+        tiltDelta = Math.max(tiltDelta - 1, -1);
+    }
+});

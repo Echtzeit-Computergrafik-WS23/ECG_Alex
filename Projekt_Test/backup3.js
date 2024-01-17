@@ -565,7 +565,7 @@ function generateBlockByIndex(index) {
 }
 
 function getCurrentShape() {
-    return randomShapes[(totalBlockCount) % 7]
+    return randomShapes[(totalBlockCount - 1) % 7]
 }
 
 // asd ------------------------------------------------------------------------
@@ -936,38 +936,9 @@ function updateBlockInstanceAttributes(time) {
 
     switch (shapeIdx) {
         case 0:
+            console.log(blockIABOs[shapeIdx])
             gl.bindBuffer(gl.ARRAY_BUFFER, blockIABOs[shapeIdx].glObject);
             gl.bufferData(gl.ARRAY_BUFFER, blockInstanceAttributes[shapeIdx], gl.DYNAMIC_DRAW);
-            break;
-        case 1:
-            gl.bindBuffer(gl.ARRAY_BUFFER, blockIABOs[shapeIdx].glObject);
-            gl.bufferData(gl.ARRAY_BUFFER, blockInstanceAttributes[shapeIdx], gl.DYNAMIC_DRAW);
-
-            break;
-        case 4:
-            gl.bindBuffer(gl.ARRAY_BUFFER, blockIABOs[shapeIdx].glObject);
-            gl.bufferData(gl.ARRAY_BUFFER, blockInstanceAttributes[shapeIdx], gl.DYNAMIC_DRAW);
-
-            break;
-        case 2:
-            gl.bindBuffer(gl.ARRAY_BUFFER, blockIABOs[shapeIdx].glObject);
-            gl.bufferData(gl.ARRAY_BUFFER, blockInstanceAttributes[shapeIdx], gl.DYNAMIC_DRAW);
-
-            break;
-        case 3:
-            gl.bindBuffer(gl.ARRAY_BUFFER, blockIABOs[shapeIdx].glObject);
-            gl.bufferData(gl.ARRAY_BUFFER, blockInstanceAttributes[shapeIdx], gl.DYNAMIC_DRAW);
-
-            break;
-        case 5:
-            gl.bindBuffer(gl.ARRAY_BUFFER, blockIABOs[shapeIdx].glObject);
-            gl.bufferData(gl.ARRAY_BUFFER, blockInstanceAttributes[shapeIdx], gl.DYNAMIC_DRAW);
-
-            break;
-        case 6:
-            gl.bindBuffer(gl.ARRAY_BUFFER, blockIABOs[shapeIdx].glObject);
-            gl.bufferData(gl.ARRAY_BUFFER, blockInstanceAttributes[shapeIdx], gl.DYNAMIC_DRAW);
-
             break;
     }
     //gl.bindBuffer(gl.ARRAY_BUFFER, blockIABOs[shapeIdx].glObject);
@@ -1048,7 +1019,7 @@ const block_z_drawCall = glance.createDrawCall(
         ],
         cullFace: gl.BACK,
         depthTest: gl.LEQUAL,
-        instanceCount: maxtotalBlockCount / 7,
+        instanceCount: maxtotalBlockCount,
     },
 )
 
@@ -1070,7 +1041,7 @@ const block_s_drawCall = glance.createDrawCall(
         ],
         cullFace: gl.BACK,
         depthTest: gl.LEQUAL,
-        instanceCount: maxtotalBlockCount / 7,
+        instanceCount: maxtotalBlockCount,
     },
 )
 
@@ -1092,7 +1063,7 @@ const block_l_drawCall = glance.createDrawCall(
         ],
         cullFace: gl.BACK,
         depthTest: gl.LEQUAL,
-        instanceCount: maxtotalBlockCount / 7,
+        instanceCount: maxtotalBlockCount,
     },
 )
 
@@ -1114,7 +1085,7 @@ const block_rev_l_drawCall = glance.createDrawCall(
         ],
         cullFace: gl.BACK,
         depthTest: gl.LEQUAL,
-        instanceCount: maxtotalBlockCount / 7,
+        instanceCount: maxtotalBlockCount,
     },
 )
 
@@ -1136,7 +1107,7 @@ const block_2x2_drawCall = glance.createDrawCall(
         ],
         cullFace: gl.BACK,
         depthTest: gl.LEQUAL,
-        instanceCount: maxtotalBlockCount / 7,
+        instanceCount: maxtotalBlockCount,
     },
 )
 
@@ -1158,7 +1129,7 @@ const block_t_drawCall = glance.createDrawCall(
         ],
         cullFace: gl.BACK,
         depthTest: gl.LEQUAL,
-        instanceCount: maxtotalBlockCount / 7,
+        instanceCount: maxtotalBlockCount,
     },
 )
 
@@ -1180,7 +1151,7 @@ const block_4x1_drawCall = glance.createDrawCall(
         ],
         cullFace: gl.BACK,
         depthTest: gl.LEQUAL,
-        instanceCount: maxtotalBlockCount / 7,
+        instanceCount: maxtotalBlockCount,
     },
 )
 
@@ -1270,31 +1241,31 @@ setRenderLoop((time) => {
     viewRotationMatrix.setDirty();
     glance.performDrawCall(gl, skyDrawCall, time);
 
-    //switch (getCurrentShape()) {
-    //    case 0:
-    glance.performDrawCall(gl, block_z_drawCall, time)
-    //        break;
-    //    case 1:
-    glance.performDrawCall(gl, block_s_drawCall, time)
-    // break;
-    // case 2:
-    glance.performDrawCall(gl, block_l_drawCall, time)
-    //     break;
-    // case 3:
-    glance.performDrawCall(gl, block_rev_l_drawCall, time)
-    //     break;
-    // case 4:
-    glance.performDrawCall(gl, block_2x2_drawCall, time)
-    //     break;
-    // case 5:
-    glance.performDrawCall(gl, block_t_drawCall, time)
-    //     break;
-    // case 6:
-    glance.performDrawCall(gl, block_4x1_drawCall, time)
-    //         break;
-    //     default:
-    //         break;
-    // }
+    switch (getCurrentShape()) {
+        case 0:
+            glance.performDrawCall(gl, block_z_drawCall, time)
+            break;
+        case 1:
+            glance.performDrawCall(gl, block_s_drawCall, time)
+            break;
+        case 2:
+            glance.performDrawCall(gl, block_l_drawCall, time)
+            break;
+        case 3:
+            glance.performDrawCall(gl, block_rev_l_drawCall, time)
+            break;
+        case 4:
+            glance.performDrawCall(gl, block_2x2_drawCall, time)
+            break;
+        case 5:
+            glance.performDrawCall(gl, block_t_drawCall, time)
+            break;
+        case 6:
+            glance.performDrawCall(gl, block_4x1_drawCall, time)
+            break;
+        default:
+            break;
+    }
     blockDrawCalls.forEach((drawCall) => glance.performDrawCall(gl, drawCall, time));
     //glance.performDrawCall(gl, block_z_drawCall, time)
 
