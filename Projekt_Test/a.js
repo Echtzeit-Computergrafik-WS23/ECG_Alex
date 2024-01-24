@@ -576,9 +576,9 @@ const blockVAO = glance.createVAO(
 )
 
 
-const blockTextureAmbient = await glance.loadTextureNow(gl, "Tetrix/img/block_ambient.png")
-const blockTextureDiffuse = await glance.loadTextureNow(gl, "Tetrix/img/block_diffuse.png")
-const blockTextureSpecular = await glance.loadTextureNow(gl, "Tetriximg/block_specular.png")
+const blockTextureAmbient = await glance.loadTextureNow(gl, ".Tetrix/img/block_ambient.png")
+const blockTextureDiffuse = await glance.loadTextureNow(gl, ".Tetrix/img/block_diffuse.png")
+const blockTextureSpecular = await glance.loadTextureNow(gl, ".Tetriximg/block_specular.png")
 
 
 
