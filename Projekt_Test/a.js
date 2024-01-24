@@ -576,9 +576,9 @@ const blockVAO = glance.createVAO(
 )
 
 
-const blockTextureAmbient = await glance.loadTextureNow(gl, ".img/block_ambient.png")
-const blockTextureDiffuse = await glance.loadTextureNow(gl, ".img/block_diffuse.png")
-const blockTextureSpecular = await glance.loadTextureNow(gl, ".img/block_specular.png")
+const blockTextureAmbient = await glance.loadTextureNow(gl, "img/block_ambient.png")
+const blockTextureDiffuse = await glance.loadTextureNow(gl, "img/block_diffuse.png")
+const blockTextureSpecular = await glance.loadTextureNow(gl, "img/block_specular.png")
 
 
 
@@ -600,12 +600,12 @@ const skyABO = glance.createAttributeBuffer(gl, "sky-abo", glance.createSkyBoxAt
 const skyVAO = glance.createVAO(gl, "sky-vao", skyIBO, glance.buildAttributeMap(skyShader, skyABO))
 
 const skyCubemap = await glance.loadCubemapNow(gl, "sky-texture", [
-    "./ECG_Alex/Tetrix/CloudyCrown_Sunset_Left.png",
-    "./ECG_Alex/Tetrix/CloudyCrown_Sunset_Right.png",
-    "./ECG_Alex/Tetrix/CloudyCrown_Sunset_Up.png",
-    "./ECG_Alex/Tetrix/CloudyCrown_Sunset_Down.png",
-    "./ECG_Alex/Tetrix/CloudyCrown_Sunset_Front.png",
-    "./ECG_Alex/Tetrix/CloudyCrown_Sunset_Back.png",
+    "./CloudyCrown_Sunset_Left.png",
+    "./loudyCrown_Sunset_Right.png",
+    "./CloudyCrown_Sunset_Up.png",
+    "./CloudyCrown_Sunset_Down.png",
+    "./CloudyCrown_Sunset_Front.png",
+    "./CloudyCrown_Sunset_Back.png",
 ], { flipY: false })
 
 // #endregion
