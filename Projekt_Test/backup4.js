@@ -2,7 +2,6 @@
 import glance, { DepthTest } from './js/glance.js';
 import { createBlock } from './testing.js'
 import { Playfield } from './playfield.js'
-import * as global from './globalGameVariables.js'
 
 // Get the WebGL context
 const canvas = document.getElementById('canvas');
@@ -162,14 +161,10 @@ let currentBlockIndex = 0;
 let randomShapes = randomizeShapes();
 let blockComponentOffsets = [];
 
-
+let blocks = []
 let currentBlock;
-let indicatorBlock;
 
 function spawnNewBlock() {
-    if (currentBlock) updateBlockInstanceAttributes();
-    global.addClearedLines(gameField.clear());
-    console.log(global.level);
     blockOffset = [0, 0, 0]
     totalBlockCount++;
 
@@ -180,48 +175,97 @@ function spawnNewBlock() {
         randomShapes = randomizeShapes();
     }
 
-    if (currentBlock) {
-        gameField.clearIndicator(currentBlock.indicatorBlock)
-    }
+    lastBlockIndex = currentBlockIndex;
+    currentBlockIndex += 4;  // Every tetris block consists of 4 blocks
 
     let index = getCurrentShapeIndex();
     switch (getCurrentShapeIndex()) {
         case 0:  // Z Block
-            currentBlock = createBlock(0);
-            indicatorBlock = createBlock(0, 2);
+            blockComponentOffsets = getOffsetById(index)
+            currentBlock = createBlock(0, lastBlockIndex);
             break;
         case 1:  // S Block
-            currentBlock = createBlock(1);
-            indicatorBlock = createBlock(1, 2);
+            blockComponentOffsets = getOffsetById(index)
+            currentBlock = createBlock(1, lastBlockIndex);
             break;
         case 2:  // L Block
-            currentBlock = createBlock(2);
-            indicatorBlock = createBlock(2, 2);
+            blockComponentOffsets = getOffsetById(index)
+            currentBlock = createBlock(2, lastBlockIndex);
             break;
         case 3:  // Reversed L Block
-            currentBlock = createBlock(3);
-            indicatorBlock = createBlock(3, 2);
+            blockComponentOffsets = getOffsetById(index)
+            currentBlock = createBlock(3, lastBlockIndex);
             break;
         case 4:  // 2x2 Block
-            currentBlock = createBlock(4);
-            indicatorBlock = createBlock(4, 2);
+            blockComponentOffsets = getOffsetById(index)
+            currentBlock = createBlock(4, lastBlockIndex);
             break;
         case 5:  // T Block
-            currentBlock = createBlock(5);
-            indicatorBlock = createBlock(5, 2);
+            blockComponentOffsets = getOffsetById(index)
+            currentBlock = createBlock(5, lastBlockIndex);
             break;
         case 6:  // 4x1 Block
-            currentBlock = createBlock(6);
-            indicatorBlock = createBlock(6, 2);
+            blockComponentOffsets = getOffsetById(index)
+            currentBlock = createBlock(6, lastBlockIndex);
             break;
     }
-    //console.log("CREATED NEW BLOCK: ", currentBlock)
-    gameField.placeBlock(currentBlock);
-    currentBlock.setIndicator(indicatorBlock)
-    //console.log(currentBlock.indicatorBlock)
-    //gameField.setIndicator(currentBlock);
+    blocks.push(currentBlock)
+    console.log(blocks)
 }
 
+function getOffsetById(index) {
+    switch (index) {
+        case 0:  // Z Block
+            return [
+                [0, 1, 0],
+                [1, 1, 0],
+                [1, 0, 0],
+                [2, 0, 0]
+            ]
+        case 1:  // S Block
+            return [
+                [0, 0, 0],
+                [1, 0, 0],
+                [1, 1, 0],
+                [2, 1, 0]
+            ]
+        case 2:  // L Block
+            return [
+                [0, 0, 0],
+                [0, 1, 0],
+                [1, 1, 0],
+                [2, 1, 0]
+            ]
+        case 3:  // Reversed L Block
+            return [
+                [0, 1, 0],
+                [1, 1, 0],
+                [2, 1, 0],
+                [2, 0, 0]
+            ]
+        case 4:  // 2x2 Block
+            return [
+                [0, 0, 0],
+                [1, 0, 0],
+                [0, 1, 0],
+                [1, 1, 0]
+            ]
+        case 5:  // T Block
+            return [
+                [0, 0, 0],
+                [1, 0, 0],
+                [1, 1, 0],
+                [2, 0, 0],
+            ]
+        case 6:  // 4x1 Block
+            return [
+                [0, 0, 0],
+                [1, 0, 0],
+                [2, 0, 0],
+                [3, 0, 0]
+            ]
+    }
+}
 
 function getCurrentShapeIndex() {
     return randomShapes[(totalBlockCount) % 7]
@@ -275,7 +319,6 @@ in vec3 f_worldPos;
 in vec3 f_normal;
 in vec2 f_texCoord;
 in float f_alpha;
-in vec3 f_color;
 
 out vec4 FragColor;
 
@@ -293,19 +336,18 @@ void main() {
     vec3 normal = normalize(f_normal);
     vec3 lightDir = normalize(u_lightPos - f_worldPos);
     float diffuseIntensity = max(dot(normal, lightDir), 0.0);
-    vec3 diffuse = diffuseIntensity * u_lightColor;
-    vec3 adjustedDiffuse = mix(diffuse, f_color, 1.0);
+    vec3 diffuse = diffuseIntensity * u_lightColor * texDiffuse;
 
     // specular
     vec3 viewDir = normalize(u_viewPos - f_worldPos);
     vec3 halfWay = normalize(lightDir + viewDir);
     float specularIntensity = pow(max(dot(normal, halfWay), 0.0), u_shininess);
     vec3 specular = (u_specular * specularIntensity) * texSpecular * u_lightColor;
- 
-    // color
-    FragColor = vec4((ambient + adjustedDiffuse + specular), f_alpha);
 
-    gl_FragDepth =  1.0 - f_alpha + gl_FragCoord.z;;
+    // color
+    FragColor = vec4(ambient + diffuse + specular, f_alpha);
+    //FragColor = vec4(f_alpha, 0.0, 1, 1);
+    //gl_FragDepth = (f_alpha * 0.05);
 }
 `
 
@@ -448,27 +490,23 @@ const instancedPhongVertexShader = `#version 300 es
     in mat4 a_modelMatrix;
     in mat3 a_normalMatrix;
     in float a_alpha;
-    in vec3 a_color;
+    in float a_destroyed;
 
     out vec3 f_worldPos;
     out vec3 f_normal;
     out vec2 f_texCoord;
     out float f_alpha;
-    out vec3 f_color;
 
     void main() {
-        if (a_alpha >= 0.001) {
-
+        if (a_destroyed == 0.0) {
             f_worldPos = vec3(a_modelMatrix * vec4(a_pos, 1.0));
             f_normal = a_normalMatrix * a_normal;
             f_texCoord = a_texCoord;
             f_alpha = a_alpha;
-            f_color = a_color;
             gl_Position = u_projectionMatrix * u_viewMatrix * a_modelMatrix * vec4(a_pos, 1.0);
         }
     }
 `;
-
 
 const phongFragmentShader = `#version 300 es
     precision mediump float;
@@ -487,7 +525,6 @@ const phongFragmentShader = `#version 300 es
     in vec3 f_normal;
     in vec2 f_texCoord;
     in float f_alpha;
-    in vec3 f_color;
 
     out vec4 FragColor;
 
@@ -522,21 +559,19 @@ const phongFragmentShader = `#version 300 es
 // #endregion
 
 // #region Block Shader Components
-const aspectRatio = canvas.width / canvas.height;
-const projectionMatrix = mat4.perspective(Math.PI / 4, aspectRatio, 0.1, 1000)
+const projectionMatrix = mat4.perspective(Math.PI / 4, 1, 0.1, 1000)
 
 const blockShader = glance.buildShaderProgram(gl, "block-shader", instancedPhongVertexShader, fragmentShaderSource, {
-    u_ambient: 0.7,
-    u_specular: 0.9,
+    u_ambient: 1,
+    u_specular: 0.6,
     u_shininess: 64,
-    u_lightPos: [0, -5, 0],
+    u_lightPos: [0, 10, 0],
     u_lightColor: [1, 1, 1],
     u_projectionMatrix: projectionMatrix,
     u_texAmbient: 0,
     u_texDiffuse: 1,
     u_texSpecular: 2,
 })
-
 
 let blockInfo = createTetrisBlock();
 
@@ -548,22 +583,18 @@ let blockABO = glance.createAttributeBuffer(gl, "block-abo", blockInfo.attribute
     a_texCoord: { size: 2, type: gl.FLOAT },
 });
 
+const maxtotalBlockCount = 7000;
 
-const maxtotalBlockCount = 2 * 11 * 18;
-
-let blockAttribLength = 29
-const blockInstanceAttributes = new Float32Array(maxtotalBlockCount * blockAttribLength);  // 16 + 9 + 1
+let blockAttribLength = 27
+const blockInstanceAttributes = new Float32Array(maxtotalBlockCount * blockAttribLength);  // 16 + 9 + 1 + 1
 
 const blockIABO = glance.createAttributeBuffer(gl, "block-iabo", blockInstanceAttributes, {
     a_modelMatrix: { size: 4, width: 4, type: gl.FLOAT, divisor: 1 },
     a_normalMatrix: { size: 3, width: 3, type: gl.FLOAT, divisor: 1 },
     a_alpha: { size: 1, width: 1, type: gl.FLOAT, divisor: 1 },
-    a_color: { size: 3, width: 1, type: gl.FLOAT, divisor: 1 }
-    //a_warning: { size: 1, width: 1, type: gl.FLOAT, divisor: 1 }
+    a_destroyed: { size: 1, width: 1, type: gl.FLOAT, divisor: 1 }
+
 });
-
-
-
 
 const blockVAO = glance.createVAO(
     gl,
@@ -575,10 +606,10 @@ const blockVAO = glance.createVAO(
     )
 )
 
-
 const blockTextureAmbient = await glance.loadTextureNow(gl, "/img/block_ambient.png")
 const blockTextureDiffuse = await glance.loadTextureNow(gl, "./img/block_diffuse.png")
 const blockTextureSpecular = await glance.loadTextureNow(gl, "./img/block_specular.png")
+
 
 
 
@@ -636,13 +667,13 @@ const playfieldABO = glance.createAttributeBuffer(gl, "playfield-abo", playfield
 
 const playfieldCount = 2;
 
-let playfieldAttribLength = 29;
-const playfieldInstanceAttributes = new Float32Array(playfieldCount * playfieldAttribLength); // 16 + 9 + 1 + 1
+let playfieldAttribLength = 27;
+const playfieldInstanceAttributes = new Float32Array(playfieldCount * 27); // 16 + 9 + 1 + 1
 const playfieldIABO = glance.createAttributeBuffer(gl, "playfield-iabo", playfieldInstanceAttributes, {
     a_modelMatrix: { size: 4, width: 4, type: gl.FLOAT, divisor: 1 },
     a_normalMatrix: { size: 3, width: 3, type: gl.FLOAT, divisor: 1 },
     a_alpha: { size: 1, width: 1, type: gl.FLOAT, divisor: 1 },
-    a_color: { size: 3, width: 1, type: gl.FLOAT, divisor: 1 }
+    a_destroyed: { size: 1, width: 1, type: gl.FLOAT, divisor: 1 }
 
 });
 
@@ -660,119 +691,214 @@ const playfieldVAO = glance.createVAO(
 
 // #region Block Instance Update
 
-
+var blockSpawn = [-1.5, 12, 0]
 var blockOffset = [0, 0, 0]
 let firstFieldActive = true;
+let timesPressed = 0;
+let timesRotated = 0;
 let xMove = [1, 0, 0]
 let yMove = [0, 1, 0]
 let rPressed = false;
 
-
-function updateBlockInstanceAttributes() {
-    let field = gameField._boards;
-    let indexCounter = 0;
-    let shape = currentBlock.activeShape;
-
-    for (let z = 0; z < field.length; z++) {
-        
-        // Set color of current block.
-        for (let j = 0; j < shape.length; j++) {
-            for (let i = 0; i < shape[j].length; i++) {
-                if (shape[j][i] != -1) {
-                    //console.log(currentBlock.location)
-                    if (firstFieldActive && z == 0) {
-                        let index = (currentBlock.location[1] + j) * 11 + currentBlock.location[0] + i;
-                        blockInstanceAttributes.set(currentBlock.color, index * blockAttribLength + 26);
-                    }
-                    if (!firstFieldActive && z == 1) {
-                        let index = (1 * 11 * 18) + ((currentBlock.location[1] + j) * 11) + currentBlock.location[0] + i;
-                        blockInstanceAttributes.set(currentBlock.color, index * blockAttribLength + 26);
-                    }
-                    if (currentBlock.location[0] + i == 5) {
-                        if (firstFieldActive && z == 1) {
-                            let index = (1 * 11 * 18) + ((currentBlock.location[1] + j) * 11) + currentBlock.location[0] + i;
-                            blockInstanceAttributes.set(currentBlock.color, index * blockAttribLength + 26);
-                        } if (!firstFieldActive && z == 0) {
-                            let index = ((currentBlock.location[1] + j) * 11) + currentBlock.location[0] + i;
-                            blockInstanceAttributes.set(currentBlock.color, index * blockAttribLength + 26);
-
-                        }
-                    }
-                }
+function moveBlocksDown(removed) {
+    console.log("                   -----               ",removed)
+    for (let i = 0; i < blocks.length - 1; i++) {
+        let added = false;
+        for (let j = 0; j < 4; j++) {
+            
+            if (removed[0].includes(i * 4 + j)) {
+                blockInstanceAttributes.set(1.0, i * 4 + j + 26);
+                continue;
             }
-        }
-        for (let y = 0; y < field[0].length; y++) {
-            for (let x = 0; x < field[0][0].length; x++) {
-                if (field[z][y][x] != -1) {
-
-                    if ((firstFieldActive && z == 0)) {
-                        blockInstanceAttributes.set([1.0], indexCounter * blockAttribLength + 25);
-                        if (field[z][y][x] == 2) {
-                            blockInstanceAttributes.set([0.5], indexCounter * blockAttribLength + 25);
-                            blockInstanceAttributes.set(currentBlock.color, indexCounter * blockAttribLength + 26);
-                        }
-                    }
-                    else if (!firstFieldActive && z == 1) {
-                        blockInstanceAttributes.set([1.0], indexCounter * blockAttribLength + 25);
-                        if (field[z][y][x] == 2) {
-                            blockInstanceAttributes.set([0.5], indexCounter * blockAttribLength + 25);
-                            blockInstanceAttributes.set(currentBlock.color, indexCounter * blockAttribLength + 26);
-                        }
-                    }
-                    else blockInstanceAttributes.set([0.2], indexCounter * blockAttribLength + 25);
-                }
-                else {
-                    blockInstanceAttributes.set([0.0], indexCounter * blockAttribLength + 25);
-                    //blockInstanceAttributes.set(currentBlock.color, indexCounter * blockAttribLength + 26);
-
-                }
-                indexCounter++;
+            if (blocks[i].visualPosition[1] - getOffsetById(blocks[i].blockIndex)[j] < -1 * removed[1][removed[1].length - 1]) {
+                console.log("CONTINUEEEEEEE")
+                continue;
             }
+            if (!added) {
+                blocks[i].setVisualPosition = removed[1].length;
+            }
+
+            var modelMatrix = mat4.identity();
+
+            var angleY = blocks[i].timesPressed * (Math.PI / 2);  // Rotation to match current playfield.
+            var angleZ = blocks[i].timesRotated * (Math.PI / 2);  // Arrow up rotation
+            //console.log(currentBlock)
+
+            mat4.rotate(modelMatrix, angleY, [0, 1, 0]);  // Rotate around Y axis
+            mat4.translate(modelMatrix, blockSpawn);  // And then set to correct start position.
+
+            console.log(blocks[i].visualPosition)
+
+            mat4.translate(modelMatrix, blocks[i].visualPosition);
+
+            // Change block rotation pivot
+            switch (blocks[i].blockIndex) {
+                case 0:  // Z Block
+                    mat4.translate(modelMatrix, [1.5, 1.5, 0])
+                    angleZ = (blocks[i].timesRotated % 2) *(Math.PI / 2);
+                    mat4.rotate(modelMatrix, angleZ, [0, 0, 1]);
+                    mat4.translate(modelMatrix, [-1.5, -1.5, 0]);
+                    break;
+                case 1:  // S Block
+                    mat4.translate(modelMatrix, [1.5, 1.5, 0])
+                    angleZ = (blocks[i].timesRotated % 2) * (Math.PI / 2);
+                    mat4.rotate(modelMatrix, angleZ, [0, 0, 1]);
+                    mat4.translate(modelMatrix, [-1.5, -1.5, 0])
+                    break;
+
+                case 2:  // L Block
+                    mat4.translate(modelMatrix, [1.5, 1.5, 0])
+                    mat4.rotate(modelMatrix, angleZ, [0, 0, 1]);
+                    mat4.translate(modelMatrix, [-1.5, -1.5, 0])
+                    break;
+                case 3:  // Rev L Block
+                    mat4.translate(modelMatrix, [1.5, 1.5, 0])
+                    mat4.rotate(modelMatrix, angleZ, [0, 0, 1]);
+                    mat4.translate(modelMatrix, [-1.5, -1.5, 0])
+                    break;
+                case 4:  // 2x2 Block
+                    break;
+                case 5:  // T Block
+                    mat4.translate(modelMatrix, [1.5, 1.5, 0])
+                    mat4.rotate(modelMatrix, angleZ, [0, 0, 1]);
+                    mat4.translate(modelMatrix, [-1.5, -1.5, 0])
+
+                    break;
+                case 6:  // 4x1 Block
+                    mat4.translate(modelMatrix, [1.5, .5, 0])
+                    angleZ = (blocks[i].timesRotated % 2) * (Math.PI / 2);
+                    mat4.rotate(modelMatrix, angleZ, [0, 0, 1]);
+                    mat4.translate(modelMatrix, [-1.5, -.5, 0])
+
+                    break;
+            }
+
+            let offset = getOffsetById(blocks[i].blockIndex)[j]
+            mat4.translate(modelMatrix, offset)
+
+            const arrayOffset = (i * 4 + j) * blockAttribLength;
+            blockInstanceAttributes.set(modelMatrix, arrayOffset);
+            const normalMatrix = mat3.fromMat4(mat4.transpose(mat4.invert(modelMatrix)));
+            blockInstanceAttributes.set(normalMatrix, arrayOffset + 16);
         }
-        gl.bindBuffer(gl.ARRAY_BUFFER, blockIABO.glObject);
-        gl.bufferData(gl.ARRAY_BUFFER, blockInstanceAttributes, gl.DYNAMIC_DRAW);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
     }
+    gl.bindBuffer(gl.ARRAY_BUFFER, blockIABO.glObject);
+    gl.bufferData(gl.ARRAY_BUFFER, blockInstanceAttributes, gl.DYNAMIC_DRAW);
+
+    //gl.bindBuffer(gl.ARRAY_BUFFER, blockIABOs[shapeIdx].glObject);
+    //gl.bufferData(gl.ARRAY_BUFFER, blockInstanceAttributes[shapeIdx], gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
 }
 
-let blockSpawn = [-5, 0, 0]
+function updateBlockInstanceAttributes() {
+    let shapeIdx = getCurrentShapeIndex();
+    let debug = []
 
-function initBlockAttributes() {
-    let field = gameField._boards;
-    let indexCounter = 0;
-    for (let i = 0; i < field.length; i++) {
-        for (let y = 0; y < field[0].length; y++) {
-            for (let x = 0; x < field[0][0].length; x++) {
-                var modelMatrix = mat4.identity();
+    if (currentBlock) currentBlock.setVisualValues(blockOffset, timesPressed, timesRotated)
 
-                blockInstanceAttributes.set([0.0], indexCounter * blockAttribLength + 25);
-                mat4.translate(modelMatrix, [-0.5, 0, 0])
-                mat4.translate(modelMatrix, blockSpawn)
+    for (let i = lastBlockIndex; i < currentBlockIndex; i++) {
+        var modelMatrix = mat4.identity();
 
-                // First or second board. 
-                if (i == 0) {
-                    mat4.translate(modelMatrix, [x, field[0].length - 1 - y, 0])
-                } else {
-                    mat4.translate(modelMatrix, [-blockSpawn[0], field[0].length - 1 - y, -1 * blockSpawn[0] - x])
+        var angleY = timesPressed * (Math.PI / 2);  // Rotation to match current playfield.
+        var angleZ = timesRotated * (Math.PI / 2);  // Arrow up rotation
+        //console.log(currentBlock)
+
+        mat4.rotate(modelMatrix, angleY, [0, 1, 0]);  // Rotate around Y axis
+        mat4.translate(modelMatrix, blockSpawn);  // And then set to correct start position.
+
+        mat4.translate(modelMatrix, blockOffset)
+
+        // Change block rotation pivot
+        switch (getCurrentShapeIndex()) {
+            case 0:  // Z Block
+                mat4.translate(modelMatrix, [1.5, 1.5, 0])
+                angleZ = (timesRotated % 2) * (Math.PI / 2);
+                mat4.rotate(modelMatrix, angleZ, [0, 0, 1]);
+                mat4.translate(modelMatrix, [-1.5, -1.5, 0]);
+                break;
+            case 1:  // S Block
+                mat4.translate(modelMatrix, [1.5, 1.5, 0])
+                angleZ = (timesRotated % 2) * (Math.PI / 2);
+                mat4.rotate(modelMatrix, angleZ, [0, 0, 1]);
+                mat4.translate(modelMatrix, [-1.5, -1.5, 0])
+                break;
+
+            case 2:  // L Block
+                mat4.translate(modelMatrix, [1.5, 1.5, 0])
+                mat4.rotate(modelMatrix, angleZ, [0, 0, 1]);
+                mat4.translate(modelMatrix, [-1.5, -1.5, 0])
+                break;
+            case 3:  // Rev L Block
+                mat4.translate(modelMatrix, [1.5, 1.5, 0])
+                mat4.rotate(modelMatrix, angleZ, [0, 0, 1]);
+                mat4.translate(modelMatrix, [-1.5, -1.5, 0])
+                break;
+            case 4:  // 2x2 Block
+                break;
+            case 5:  // T Block
+                mat4.translate(modelMatrix, [1.5, 1.5, 0])
+                mat4.rotate(modelMatrix, angleZ, [0, 0, 1]);
+                mat4.translate(modelMatrix, [-1.5, -1.5, 0])
+
+                break;
+            case 6:  // 4x1 Block
+                mat4.translate(modelMatrix, [1.5, .5, 0])
+                angleZ = (timesRotated % 2) * (Math.PI / 2);
+                mat4.rotate(modelMatrix, angleZ, [0, 0, 1]);
+                mat4.translate(modelMatrix, [-1.5, -.5, 0])
+
+                break;
+        }
+
+
+        let offset = blockComponentOffsets[i - lastBlockIndex]
+        mat4.translate(modelMatrix, offset)
+
+
+        const arrayOffset = i * blockAttribLength;
+        blockInstanceAttributes.set(modelMatrix, arrayOffset);
+        const normalMatrix = mat3.fromMat4(mat4.transpose(mat4.invert(modelMatrix)));
+        blockInstanceAttributes.set(normalMatrix, arrayOffset + 16);
+        // blockInstanceAttributes.set([alpha * (i - lastBlockIndex)], arrayOffset + 25);  // DEBUG
+        //blockInstanceAttributes.set([alpha], arrayOffset + 25);
+
+        //blockDrawCall.vao = blockVAOs[currentShape];
+    }
+
+    let alpha = 1.0;
+    if (blocks[0]) {
+        for (let i = 0; i < blocks.length; i++) {
+            for (let j = blocks[i].startIndex; j < blocks[i].startIndex + 4; j++) {
+                const arrayOffset = j * blockAttribLength;
+
+                if (blocks[i].location[2] == 0 && firstFieldActive) {
+                    alpha = 1.0;
+                    //console.log(alpha)
                 }
-
-                blockInstanceAttributes.set(modelMatrix, indexCounter * blockAttribLength);
-                const normalMatrix = mat3.fromMat4(mat4.transpose(mat4.invert(modelMatrix)));
-                blockInstanceAttributes.set(normalMatrix, indexCounter * blockAttribLength + 16);
-
-                indexCounter++;
+                if (blocks[i].location[2] == 0 && !firstFieldActive) {
+                    alpha = 0.2;
+                }
+                if (blocks[i].location[2] == 1 && !firstFieldActive) {
+                    alpha = 1.0;
+                }
+                if (blocks[i].location[2] == 1 && firstFieldActive) {
+                    alpha = 0.2;
+                }
+                blockInstanceAttributes.set([alpha], arrayOffset + 25);
             }
         }
     }
 
     gl.bindBuffer(gl.ARRAY_BUFFER, blockIABO.glObject);
     gl.bufferData(gl.ARRAY_BUFFER, blockInstanceAttributes, gl.DYNAMIC_DRAW);
+
+    //gl.bindBuffer(gl.ARRAY_BUFFER, blockIABOs[shapeIdx].glObject);
+    //gl.bufferData(gl.ARRAY_BUFFER, blockInstanceAttributes[shapeIdx], gl.DYNAMIC_DRAW);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
 }
 
-initBlockAttributes();
-
-// }
 // #endregion
 
 // #region Playfield Instance Update
@@ -787,16 +913,22 @@ function updatePlayfieldInstanceAttributes() {
 
         var alpha = 1;
         if (firstFieldActive) {
-            alpha = (i == 0) ? 1 : 0.0;
+            alpha = (i == 0) ? 1 : 0.05;
+            const arrayOffset = i * playfieldAttribLength;
+
+            playfieldInstanceAttributes.set(modelMatrix, arrayOffset);
+            playfieldInstanceAttributes.set([alpha], arrayOffset + 25);
+            const normalMatrix = mat3.fromMat4(mat4.transpose(mat4.invert(modelMatrix)));
+            playfieldInstanceAttributes.set(normalMatrix, arrayOffset + 16);
 
         } else {
-            alpha = (i == 1) ? 1 : 0.0;
+            alpha = (i == 1) ? 1 : 0.05;
+            const arrayOffset = (i == 0) ? playfieldAttribLength : 0;  // Fixes intersection being transparent. 
+            playfieldInstanceAttributes.set(modelMatrix, arrayOffset);
+            playfieldInstanceAttributes.set([alpha], arrayOffset + 25);
+            const normalMatrix = mat3.fromMat4(mat4.transpose(mat4.invert(modelMatrix)));
+            playfieldInstanceAttributes.set(normalMatrix, arrayOffset + 16);
         }
-        const arrayOffset = (i == 0) ? playfieldAttribLength : 0;  // Fixes intersection being transparent. 
-        playfieldInstanceAttributes.set(modelMatrix, arrayOffset);
-        playfieldInstanceAttributes.set([alpha], arrayOffset + 25);
-        const normalMatrix = mat3.fromMat4(mat4.transpose(mat4.invert(modelMatrix)));
-        playfieldInstanceAttributes.set(normalMatrix, arrayOffset + 16);
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, playfieldIABO.glObject);
     gl.bufferData(gl.ARRAY_BUFFER, playfieldInstanceAttributes, gl.DYNAMIC_DRAW);
@@ -809,11 +941,11 @@ function updatePlayfieldInstanceAttributes() {
 // #region Draw Calls
 
 // Scene State
-var targetViewDist = 25;
-var targetViewPan = Math.PI * 2 * 2;
+var targetViewDist = 22;
+var targetViewPan = 0;
 var targetViewTilt = 0.25;
 
-let viewHeight = 8;
+let viewHeight = 6;
 let viewDist = 22
 let viewPan = 0
 let viewTilt = 0
@@ -844,12 +976,11 @@ const blockDrawCall = glance.createDrawCall(
             [1, blockTextureDiffuse],
             [2, blockTextureSpecular],
         ],
-        cullFace: gl.FRONT,
-        depthTest: gl.LEQUAL,
+        cullFace: gl.NONE,
+        depthTest: gl.LESS,
         instanceCount: maxtotalBlockCount,
     },
 )
-
 
 const skyDrawCall = glance.createDrawCall(
     gl,
@@ -909,7 +1040,6 @@ let isSpacePressed = false;
 let animationStartTime = 0;
 const spawnInterval = 100;
 
-let firstSpawned = false;
 setRenderLoop((time) => {
     //console.log(viewPan, viewTilt, viewDist)
     gl.enable(gl.BLEND);
@@ -918,46 +1048,33 @@ setRenderLoop((time) => {
     const deltaTime = (time - lastTime) / 1000; // Convert to seconds
     lastTime = time;
     if (elapsedTime < transitionTime) updateBeginningAnimation(deltaTime)
-    if (elapsedTime > transitionTime && !firstSpawned) {
-        spawnNewBlock();
-        firstSpawned = true;
-    }
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     // if (Math.floor(time / 100 ) % 50 == 0) {
     // // console.log("blocklength:   ", blocks.length)
     //     spawnNewBlock();
     // }
     // Render all existing blocks
-
     updatePlayfieldInstanceAttributes();
-    if (firstSpawned) updateBlockInstanceAttributes(time);
-    if (currentBlock) gameField.setIndicator(currentBlock)
+    updateBlockInstanceAttributes(time);
     rotateAnimation(time)
     //console.log(blockABO.attributes.set("a_pos", [0, 1, 5]))
     viewRotationMatrix.setDirty();
 
     glance.performDrawCall(gl, skyDrawCall, time);
+
     glance.performDrawCall(gl, blockDrawCall, time)
+
     glance.performDrawCall(gl, playfieldDrawCall, time);
+    if (sPressed) {
+        spawnNewBlock();
+        sPressed = false;
+        timesRotated = 0;
+        let cleared = gameField.clear();
+        if (cleared[1].length > 0) {
+            moveBlocksDown(cleared);
+        }
+    }
 });
-
-let currentLevel = 0;
-let intervalId = setInterval(moveBlockByTime, 500);
-
-function moveBlockByTime() {
-    console.log("current: ", currentLevel, " lines cleared: ", global.clearedLines)
-    if (currentBlock && !isSpacePressed) {
-        gameField.clearIndicator(currentBlock.indicatorBlock)
-        if (!gameField.moveBlockDown(currentBlock)) spawnNewBlock();
-        gameField.setIndicator(currentBlock)
-    }
-    if (currentLevel != global.level) {
-        clearInterval(intervalId);
-        intervalId = setInterval(moveBlockByTime, global.getLevelTime());
-        currentLevel = global.level;
-    }
-}
-
 
 function updateBeginningAnimation(deltaTime) {
     elapsedTime += deltaTime;
@@ -981,23 +1098,21 @@ function rotateAnimation(time) {
 
         // Calculate elapsed time since the animation started
         const elapsedTime = time - animationStartTime;
-        let clockwise = (firstFieldActive) ? 1 : -1;
 
         // Check if the animation is still in progress
         if (elapsedTime < animationDuration) {
             // Calculate the rotation angle based on elapsed time
-            const rotationAngle = targetViewPan + clockwise * (elapsedTime / animationDuration) * (Math.PI / 2);
+            const rotationAngle = targetViewPan + (elapsedTime / animationDuration) * (Math.PI / 2);
 
             // Update viewPan based on the rotation angle
             viewPan = rotationAngle;
         } else {
             // Animation completed, reset variables
             isSpacePressed = false;
-            viewPan = targetViewPan + clockwise * Math.PI / 2;  // Set final rotation angle
+            viewPan = targetViewPan + Math.PI / 2;  // Set final rotation angle
             targetViewPan = viewPan;
             firstFieldActive = !firstFieldActive;
-            timesPressed = (timesPressed + 1) % 4;
-            // gameField.rotateField(currentBlock);
+            timesPressed = (timesPressed + 1) % 4
             //rotateActiveBlock();
         }
     }
@@ -1021,50 +1136,61 @@ onMouseWheel((e) => {
     viewDist = Math.max(1.5, Math.min(100, viewDist * (1 + Math.sign(e.deltaY) * 0.2)))
 })
 
-let timesPressed = 0;
-let enterPressed = false;
+let sPressed = false;
 onKeyDown((e) => {
-    if (e.key == "ArrowUp") {
-        gameField.clearIndicator(currentBlock.indicatorBlock)
-        gameField.rotateBlock(currentBlock);
-    }
+    console.log(e)
     if (e.key == "ArrowLeft") {
-        gameField.clearIndicator(currentBlock.indicatorBlock)
-        gameField.moveBlockLeft(currentBlock)
-        gameField.setIndicator(currentBlock)
+        if (gameField.moveBlockLeft(currentBlock)) vec3.subtract(blockOffset, xMove)
+        console.log(blockOffset)
     }
     if (e.key == "ArrowRight") {
-        gameField.clearIndicator(currentBlock.indicatorBlock)
-        gameField.moveBlockRight(currentBlock)
-        gameField.setIndicator(currentBlock)
+        if (gameField.moveBlockRight(currentBlock)) vec3.add(blockOffset, xMove)
+        console.log(blockOffset)
     }
+
     if (e.key == "ArrowDown") {
-        gameField.clearIndicator(currentBlock.indicatorBlock)
-        gameField.moveBlockDown(currentBlock)
-        gameField.setIndicator(currentBlock)
+        if (gameField.moveBlockDown(currentBlock)) vec3.subtract(blockOffset, yMove)
+        console.log(blockOffset)
     }
     if (e.key == " ") {
-        if (!isSpacePressed && gameField.rotationPossible(currentBlock)) {
-            gameField.clearIndicator(currentBlock.indicatorBlock)
-            gameField.rotateField(currentBlock);
-            gameField.setIndicator(currentBlock)
-            animationStartTime = e.timeStamp;
-            isSpacePressed = true;
+        if (!isSpacePressed) animationStartTime = e.timeStamp;
+        gameField.rotateField(currentBlock);
+        vec3.rotateX(xMove, -Math.PI / 2)
+        isSpacePressed = true;
+        if ((timesPressed) % 2 == 1) {
+            gameField.mirrorBoard1(currentBlock);
+        }
+        if ((timesPressed) % 2 == 0) {
+            gameField.mirrorBoard2(currentBlock);
         }
     }
     if (e.key == "Enter") {
-        gameField.moveBlockDownFast(currentBlock)
         spawnNewBlock();
+        let cleared = gameField.clear();
+        if (cleared[1].length > 0) {
+            moveBlocksDown(cleared);
+        }
+        timesRotated = 0;
+    }
+    if (e.key == "y") {
+        let counters = gameField.rotateBlock(currentBlock);
+        vec3.add(blockOffset, [counters[0], 0, 0])
+        vec3.subtract(blockOffset, [counters[1], 0, 0])
+        timesRotated = (timesRotated + 1) % 4;
 
     }
     if (e.key == "r") {  // debug button
-        //rPressed = true;
-        console.log(gameField._boards)
-        //moveBlocksDown([[-1, -1, -1], [4]]);
+        rPressed = true;
+        updateBlockInstanceAttributes();
+        moveBlocksDown([[-1, -1, -1],[4]]);
     }
-    // "Cheat key"
     if (e.key == "s") {
-        global.addClearedLines(1)
+        while (gameField.moveBlockDown(currentBlock)) {
+            vec3.subtract(blockOffset, yMove)
+        }
+
+        sPressed = true;
+
     }
 })
 

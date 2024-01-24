@@ -1,5 +1,7 @@
-////////////////////////////////////////////////////////////////////////////////
-// START OF BOILERPLATE CODE ///////////////////////////////////////////////////
+// #region Boilerplate Code 
+import glance, { DepthTest } from './js/glance.js';
+import { createBlock } from './testing.js'
+import { Playfield } from './playfield.js'
 
 // Get the WebGL context
 const canvas = document.getElementById('canvas');
@@ -51,10 +53,6 @@ function setRenderLoop(callback) {
 }
 setRenderLoop._callback = null;
 
-import glance from './js/glance.js';
-
-// BOILERPLATE END
-////////////////////////////////////////////////////////////////////////////////
 
 const {
     vec3,
@@ -62,103 +60,203 @@ const {
     mat4,
 } = glance;
 
-// Math ------------------------------------------------------------------------
+// #endregion
+let gameField = new Playfield();
 
-// Block builder ///////////////////////////////////////////////////////////////
+// #region Block Builder
 
+function createTetrisBlock() {
 
-function createTetrisBlock(shape) {
-    let attributes = []
-    let indices = []
-    let counter = 0;
+    let indices = [];
 
-    let size = shape[0].reduce((pv, cv) => pv + cv, 0)
-    let xCenter = size / 2;
-    let yCenter = (size >= 3) ? .5 : 1;
+    // Cube corners / vertices
+    let attributes = [
+        // Left Face
+        0, 1, .5, -1, 0, 0, 1, 1,  // 0
+        0, 0, .5, -1, 0, 0, 1, 0,
+        0, 1, -.5, -1, 0, 0, 0, 1,
+        0, 0, -.5, -1, 0, 0, 0, 0,
 
-    for (let row = 0; row < shape.length; row++) {
-        for (let col = 0; col < shape[row].length; col++) {
-            let x = col - xCenter;
-            let y = -row + yCenter;
-            if (shape[row][col] == 1) {
+        // Front Face
+        0, 1, .5, 0, 0, 1, 0, 1,  // 4
+        1, 1, .5, 0, 0, 1, 1, 1,
+        0, 0, .5, 0, 0, 1, 0, 0,
+        1, 0, .5, 0, 0, 1, 1, 0,
 
-                // Cube corners / vertices
-                const vertices = [
-                    // Left Face
-                    x, y - 1, .5, -1, 0, 0, 1, 1,  // 0
-                    x, y, .5, -1, 0, 0, 1, 0,
-                    x, y - 1, -.5, -1, 0, 0, 0, 1,
-                    x, y, -.5, -1, 0, 0, 0, 0,
+        // Right Face
+        1, 1, .5, 1, 0, 0, 1, 1,  // 8
+        1, 1, -.5, 1, 0, 0, 0, 1,
+        1, 0, .5, 1, 0, 0, 1, 0,
+        1, 0, -.5, 1, 0, 0, 0, 0,
 
-                    // Front Face
-                    x, y - 1, .5, 0, 0, 1, 0, 1,  // 4
-                    x + 1, y - 1, .5, 0, 0, 1, 1, 1,
-                    x, y, .5, 0, 0, 1, 0, 0,
-                    x + 1, y, .5, 0, 0, 1, 1, 0,
+        // Back Face
+        0, 1, -.5, 0, 0, -1, 0, 0,  // 12
+        1, 1, -.5, 0, 0, -1, 0, 1,
+        0, 0, -.5, 0, 0, -1, 1, 0,
+        1, 0, -.5, 0, 0, -1, 1, 1,
 
-                    // Right Face
-                    x + 1, y - 1, .5, 1, 0, 0, 1, 1,  // 8
-                    x + 1, y - 1, -.5, 1, 0, 0, 0, 1,
-                    x + 1, y, .5, 1, 0, 0, 1, 0,
-                    x + 1, y, -.5, 1, 0, 0, 0, 0,
+        // Top Face
+        0, 0, .5, 0, 1, 0, 0, 1,  // 16
+        0, 0, -.5, 0, 1, 0, 0, 0,
+        1, 0, .5, 0, 1, 0, 1, 1,
+        1, 0, -.5, 0, 1, 0, 1, 0,
 
-                    // Back Face
-                    x, y - 1, -.5, 0, 0, -1, 0, 0,  // 12
-                    x + 1, y - 1, -.5, 0, 0, -1, 0, 1,
-                    x, y, -.5, 0, 0, -1, 1, 0,
-                    x + 1, y, -.5, 0, 0, -1, 1, 1,
+        // Bottom Face
+        0, 1, .5, 0, -1, 0, 0, 0,  // 20
+        0, 1, -.5, 0, -1, 0, 0, 1,
+        1, 1, .5, 0, -1, 0, 1, 0,
+        1, 1, -.5, 0, -1, 0, 1, 1,
+    ];
 
-                    // Top Face
-                    x, y, .5, 0, 1, 0, 0, 1,  // 16
-                    x, y, -.5, 0, 1, 0, 0, 0,
-                    x + 1, y, .5, 0, 1, 0, 1, 1,
-                    x + 1, y, -.5, 0, 1, 0, 1, 0,
+    // Indices for the cube
+    // Left face
+    indices.push(0, 1, 2);
+    indices.push(1, 3, 2);
 
-                    // Bottom Face
-                    x, y - 1, .5, 0, -1, 0, 0, 0,  // 20
-                    x, y - 1, -.5, 0, -1, 0, 0, 1,
-                    x + 1, y - 1, .5, 0, -1, 0, 1, 0,
-                    x + 1, y - 1, -.5, 0, -1, 0, 1, 1,
-                ];
+    // Front face
+    indices.push(4, 5, 6);
+    indices.push(5, 7, 6);
 
-                vertices.forEach((value) => attributes.push(value));
+    // Right face
+    indices.push(8, 9, 10);
+    indices.push(9, 11, 10);
 
-                let refidx = counter * 24;
-                counter += 1;
+    // Back face
+    indices.push(14, 13, 12);
+    indices.push(14, 15, 13);
 
-                // Indices for the cube
-                // Left face
-                indices.push(refidx + 0, refidx + 1, refidx + 2);
-                indices.push(refidx + 1, refidx + 3, refidx + 2);
+    // Top face
+    indices.push(18, 17, 16);
+    indices.push(18, 19, 17);
 
-                // Front face
-                indices.push(refidx + 4, refidx + 5, refidx + 6);
-                indices.push(refidx + 5, refidx + 7, refidx + 6);
+    // Bottom face
+    indices.push(20, 21, 22);
+    indices.push(21, 23, 22);
 
-                // Right face
-                indices.push(refidx + 8, refidx + 9, refidx + 10);
-                indices.push(refidx + 9, refidx + 11, refidx + 10);
-
-                // Back face
-                indices.push(refidx + 14, refidx + 13, refidx + 12);
-                indices.push(refidx + 14, refidx + 15, refidx + 13);
-
-                // Top face
-                indices.push(refidx + 18, refidx + 17, refidx + 16);
-                indices.push(refidx + 18, refidx + 19, refidx + 17);
-
-                // Bottom face
-                indices.push(refidx + 20, refidx + 21, refidx + 22);
-                indices.push(refidx + 21, refidx + 23, refidx + 22);
-
-
-            }
-        }
+    return {
+        attributes: attributes,
+        indices: indices
     }
-    return [attributes, indices];
 }
 
-// Shader //////////////////////////////////////////////////////////////////////
+// #endregion
+
+// #region Shapes
+
+// Generate a randomized list of shape indices using a "7 bag" generator.
+function randomizeShapes() {
+    let init = [0, 1, 2, 3, 4, 5, 6];
+    let result = [];
+    for (let i = 0; i < 7; i++) {
+        let randIdx = Math.floor(Math.random() * init.length);
+        result.push(init[randIdx]);
+        init.splice(randIdx, 1);
+    }
+    return result;
+}
+
+var totalBlockCount = 0;
+let lastBlockIndex = 0;
+let currentBlockIndex = 0;
+let randomShapes = randomizeShapes();
+let blockComponentOffsets = [];
+
+let blocks = []
+let currentBlock;
+
+function spawnNewBlock() {
+    blockOffset = [0, 0, 0]
+    totalBlockCount++;
+
+    let shapeIdx = (totalBlockCount - 1) % 7
+
+    // Generate new blocks
+    if (shapeIdx == 0) {
+        randomShapes = randomizeShapes();
+    }
+
+    lastBlockIndex = currentBlockIndex;
+    currentBlockIndex += 4;  // Every tetris block consists of 4 blocks
+
+
+    switch (getCurrentShapeIndex()) {
+        case 0:  // Z Block
+            blockComponentOffsets = [
+                [0, 1, 0],
+                [1, 1, 0],
+                [1, 0, 0],
+                [2, 0, 0]
+            ]
+            currentBlock = createBlock(0, lastBlockIndex);
+            break;
+        case 1:  // S Block
+            blockComponentOffsets = [
+                [0, 0, 0],
+                [1, 0, 0],
+                [1, 1, 0],
+                [2, 1, 0]
+            ]
+            currentBlock = createBlock(1, lastBlockIndex);
+            break;
+        case 2:  // L Block
+            blockComponentOffsets = [
+                [0, 0, 0],
+                [0, 1, 0],
+                [1, 1, 0],
+                [2, 1, 0]
+            ]
+            currentBlock = createBlock(2, lastBlockIndex);
+            break;
+        case 3:  // Reversed L Block
+            blockComponentOffsets = [
+                [0, 1, 0],
+                [1, 1, 0],
+                [2, 1, 0],
+                [2, 0, 0]
+            ]
+            currentBlock = createBlock(3, lastBlockIndex);
+            break;
+        case 4:  // 2x2 Block
+            blockComponentOffsets = [
+                [0, 0, 0],
+                [1, 0, 0],
+                [0, 1, 0],
+                [1, 1, 0]
+            ]
+            currentBlock = createBlock(4, lastBlockIndex);
+            break;
+        case 5:  // T Block
+            blockComponentOffsets = [
+                [0, 0, 0],
+                [1, 0, 0],
+                [1, 1, 0],
+                [2, 0, 0],
+            ]
+            currentBlock = createBlock(5, lastBlockIndex);
+            break;
+        case 6:  // 4x1 Block
+            blockComponentOffsets = [
+                [0, 0, 0],
+                [1, 0, 0],
+                [2, 0, 0],
+                [3, 0, 0]
+            ]
+            currentBlock = createBlock(6, lastBlockIndex);
+            break;
+    }
+    blocks.push(currentBlock)
+
+}
+
+function getCurrentShapeIndex() {
+    return randomShapes[(totalBlockCount) % 7]
+}
+
+
+
+// #endregion
+
+// #region Vertex / Fragment Shaders
 
 const vertexShaderSource = `#version 300 es
 precision highp float;
@@ -201,37 +299,41 @@ uniform sampler2D u_texSpecular;
 in vec3 f_worldPos;
 in vec3 f_normal;
 in vec2 f_texCoord;
+in float f_alpha;
+in float f_visible;
 
 out vec4 FragColor;
 
 void main() {
+    if (f_visible != 2.0) {
 
-    // texture
-    vec3 texAmbient = texture(u_texAmbient, f_texCoord).rgb;
-    vec3 texDiffuse = texture(u_texDiffuse, f_texCoord).rgb;
-    vec3 texSpecular = texture(u_texSpecular, f_texCoord).rgb;
-
-    // ambient
-    vec3 ambient = max(vec3(u_ambient), texAmbient) * texDiffuse;
-
-    // diffuse
-    vec3 normal = normalize(f_normal);
-    vec3 lightDir = normalize(u_lightPos - f_worldPos);
-    float diffuseIntensity = max(dot(normal, lightDir), 0.0);
-    vec3 diffuse = diffuseIntensity * u_lightColor * texDiffuse;
-
-    // specular
-    vec3 viewDir = normalize(u_viewPos - f_worldPos);
-    vec3 halfWay = normalize(lightDir + viewDir);
-    float specularIntensity = pow(max(dot(normal, halfWay), 0.0), u_shininess);
-    vec3 specular = (u_specular * specularIntensity) * texSpecular * u_lightColor;
-
-    // color
-    FragColor = vec4(ambient + diffuse + specular, 1.0);
-
-    //gl_FragDepth = gl_FragCoord.z;
+        // texture
+        vec3 texAmbient = texture(u_texAmbient, f_texCoord).rgb;
+        vec3 texDiffuse = texture(u_texDiffuse, f_texCoord).rgb;
+        vec3 texSpecular = texture(u_texSpecular, f_texCoord).rgb;
+        
+        // ambient
+        vec3 ambient = max(vec3(u_ambient), texAmbient) * texDiffuse;
+        
+        // diffuse
+        vec3 normal = normalize(f_normal);
+        vec3 lightDir = normalize(u_lightPos - f_worldPos);
+        float diffuseIntensity = max(dot(normal, lightDir), 0.0);
+        vec3 diffuse = diffuseIntensity * u_lightColor * texDiffuse;
+        
+        // specular
+        vec3 viewDir = normalize(u_viewPos - f_worldPos);
+        vec3 halfWay = normalize(lightDir + viewDir);
+        float specularIntensity = pow(max(dot(normal, halfWay), 0.0), u_shininess);
+        vec3 specular = (u_specular * specularIntensity) * texSpecular * u_lightColor;
+        
+        // color
+        FragColor = vec4(ambient + diffuse + specular, f_alpha);
+        //FragColor = vec4(f_alpha, 0.0, 1, 1);
+        //gl_FragDepth = (f_alpha * 0.05);
+    }
 }
-`
+    `
 
 const instancedBlockVertexShader = `#version 300 es
 precision highp float;
@@ -299,7 +401,6 @@ const skyFragmentShaderSource = `#version 300 es
     }
 `
 
-// Playfield Shader ////////////////////////////////////////////////////////////
 
 const playfieldVertexShaderSource = `#version 300 es
 precision highp float;
@@ -361,7 +462,7 @@ const phongVertexShader = `#version 300 es
 `;
 
 
-const instancedPhongVertexShader = `#version 300 es
+const instancedPhongVertexShaderBlock = `#version 300 es
     precision highp float;
 
     uniform mat4 u_viewMatrix;
@@ -373,17 +474,55 @@ const instancedPhongVertexShader = `#version 300 es
     in mat4 a_modelMatrix;
     in mat3 a_normalMatrix;
     in float a_alpha;
+    in float a_visible;
+    in float a_cleared;
 
     out vec3 f_worldPos;
     out vec3 f_normal;
     out vec2 f_texCoord;
     out float f_alpha;
+    out float f_visible;
+
+    void main() {
+        if (a_visible != 2.0) {
+
+            vec3 transformedPos = a_pos + vec3(0.0, a_cleared, 0.0);
+            f_worldPos = vec3(a_modelMatrix * vec4(transformedPos, 1.0));
+            f_normal = a_normalMatrix * a_normal;
+            f_texCoord = a_texCoord;
+            f_alpha = a_alpha;
+            gl_Position = u_projectionMatrix * u_viewMatrix * a_modelMatrix * vec4(transformedPos, 1.0);
+        }
+    }
+`;
+
+const instancedPhongVertexShaderField = `#version 300 es
+    precision highp float;
+
+    uniform mat4 u_viewMatrix;
+    uniform mat4 u_projectionMatrix;
+
+    in vec3 a_pos;
+    in vec3 a_normal;
+    in vec2 a_texCoord;
+    in mat4 a_modelMatrix;
+    in mat3 a_normalMatrix;
+    in float a_alpha;
+    in float a_visible;
+    in float a_cleared;
+
+    out vec3 f_worldPos;
+    out vec3 f_normal;
+    out vec2 f_texCoord;
+    out float f_alpha;
+    out float f_visible;
 
     void main() {
         f_worldPos = vec3(a_modelMatrix * vec4(a_pos, 1.0));
         f_normal = a_normalMatrix * a_normal;
         f_texCoord = a_texCoord;
         f_alpha = a_alpha;
+        f_visible = a_visible;
         gl_Position = u_projectionMatrix * u_viewMatrix * a_modelMatrix * vec4(a_pos, 1.0);
     }
 `;
@@ -432,28 +571,16 @@ const phongFragmentShader = `#version 300 es
 
         // color
         FragColor = vec4(ambient + diffuse + specular, f_alpha);
+        //FragColor = vec4(f_alpha * 5.0, 1, 1, 1);
     }
 `;
 
-// Data ////////////////////////////////////////////////////////////////////////
+// #endregion
+
+// #region Block Shader Components
 const projectionMatrix = mat4.perspective(Math.PI / 4, 1, 0.1, 1000)
 
-// const phongShader = glance.buildShaderProgram(gl, "phong-shader", phongVertexShader, phongFragmentShader, {
-//     u_ambient: 0.1,
-//     u_specular: 0.6,
-//     u_shininess: 64,
-//     u_lightPos: [0, 0, 5],
-//     u_lightColor: [1, 1, 1],
-//     u_projectionMatrix: projectionMatrix,
-//     u_texAmbient: 0,
-//     u_texDiffuse: 1,
-//     u_texSpecular: 2,
-// });
-
-// Block
-
-
-const blockShader = glance.buildShaderProgram(gl, "block-shader", instancedPhongVertexShader, fragmentShaderSource, {
+const blockShader = glance.buildShaderProgram(gl, "block-shader", instancedPhongVertexShaderBlock, fragmentShaderSource, {
     u_ambient: 1,
     u_specular: 0.6,
     u_shininess: 64,
@@ -465,347 +592,48 @@ const blockShader = glance.buildShaderProgram(gl, "block-shader", instancedPhong
     u_texSpecular: 2,
 })
 
-// Shapes ------------------------------------------------------------------------
+let blockInfo = createTetrisBlock();
 
-const shape_a = [
-    [1, 1, 0, 0],
-    [0, 1, 1, 0],
-    [0, 0, 0, 0]
-]
+const blockIBO = glance.createIndexBuffer(gl, new Uint16Array(blockInfo.indices));
 
-const shape_b = [
-    [0, 1, 1, 0],
-    [1, 1, 0, 0],
-    [0, 0, 0, 0]
-]
-
-const shape_c = [
-    [1, 1, 1, 0],
-    [1, 0, 0, 0],
-    [0, 0, 0, 0]
-]
-
-const shape_d = [
-    [1, 1, 1, 0],
-    [0, 0, 1, 0],
-    [0, 0, 0, 0]
-]
-
-const shape_e = [
-    [1, 1, 0, 0],
-    [1, 1, 0, 0],
-    [0, 0, 0, 0]
-]
-
-const shape_f = [
-    [1, 1, 1, 0],
-    [0, 1, 0, 0],
-    [0, 0, 0, 0]
-]
-
-const shape_g = [
-    [1, 1, 1, 1],
-    [0, 0, 0, 0],
-    [0, 0, 0, 0]
-]
-
-const shapes = [
-    shape_a,
-    shape_b,
-    shape_c,
-    shape_d,
-    shape_e,
-    shape_f,
-    shape_g
-]
-
-// Generate a randomized list of shape indices using a "7 bag" generator.
-function randomizeShapes() {
-    let init = [0, 1, 2, 3, 4, 5, 6];
-    let result = [];
-    for (let i = 0; i < 7; i++) {
-        let randIdx = Math.floor(Math.random() * init.length);
-        result.push(init[randIdx]);
-        init.splice(randIdx, 1);
-    }
-    return result;
-}
-
-var totalBlockCount = 0;
-var individualBlockCount = [0, 0, 0, 0, 0, 0, 0];
-
-var randomShapes = randomizeShapes()
-
-// Function to generate a random Tetris block
-function generateRandomBlock() {
-    totalBlockCount++;
-    console.log("generating new block nr.   " + totalBlockCount)
-    if ((totalBlockCount) % 7 == 0) {
-        randomShapes = randomizeShapes();
-    }
-    const randomShape = randomShapes[(totalBlockCount) % 7]
-
-    console.log(" ok                ", shapes[randomShape])
-    const tetrisBlock = createTetrisBlock(shapes[randomShape]);
-    individualBlockCount[randomShape]++;
-    console.log(individualBlockCount)
-    return {
-        attributes: new Float32Array(tetrisBlock[0]),
-        indices: new Uint16Array(tetrisBlock[1])
-    };
-}
-
-function generateBlockByIndex(index) {
-    const tetrisBlock = createTetrisBlock(shapes[index]);
-
-    return {
-        attributes: new Float32Array(tetrisBlock[0]),
-        indices: new Uint16Array(tetrisBlock[1])
-    };
-}
-
-function getCurrentShape() {
-    return randomShapes[(totalBlockCount - 1) % 7]
-}
-
-// asd ------------------------------------------------------------------------
-
-let tetrisBlockInfo = [
-    generateBlockByIndex(0),
-    generateBlockByIndex(1),
-    generateBlockByIndex(2),
-    generateBlockByIndex(3),
-    generateBlockByIndex(4),
-    generateBlockByIndex(5),
-    generateBlockByIndex(6),
-];
-
-const blockIBOs = [
-    glance.createIndexBuffer(gl, new Uint16Array(tetrisBlockInfo[0].indices)),
-    glance.createIndexBuffer(gl, new Uint16Array(tetrisBlockInfo[1].indices)),
-    glance.createIndexBuffer(gl, new Uint16Array(tetrisBlockInfo[2].indices)),
-    glance.createIndexBuffer(gl, new Uint16Array(tetrisBlockInfo[3].indices)),
-    glance.createIndexBuffer(gl, new Uint16Array(tetrisBlockInfo[4].indices)),
-    glance.createIndexBuffer(gl, new Uint16Array(tetrisBlockInfo[5].indices)),
-    glance.createIndexBuffer(gl, new Uint16Array(tetrisBlockInfo[6].indices)),
-]
-
-const blockABOs = [
-    glance.createAttributeBuffer(gl, "block_z-abo", tetrisBlockInfo[0].attributes, {
-        a_pos: { size: 3, type: gl.FLOAT },
-        a_normal: { size: 3, type: gl.FLOAT },
-        a_texCoord: { size: 2, type: gl.FLOAT },
-    }),
-    glance.createAttributeBuffer(gl, "block_s-abo", tetrisBlockInfo[1].attributes, {
-        a_pos: { size: 3, type: gl.FLOAT },
-        a_normal: { size: 3, type: gl.FLOAT },
-        a_texCoord: { size: 2, type: gl.FLOAT },
-    }),
-    glance.createAttributeBuffer(gl, "block_l-abo", tetrisBlockInfo[2].attributes, {
-        a_pos: { size: 3, type: gl.FLOAT },
-        a_normal: { size: 3, type: gl.FLOAT },
-        a_texCoord: { size: 2, type: gl.FLOAT },
-    }),
-    glance.createAttributeBuffer(gl, "block_rev_l-abo", tetrisBlockInfo[3].attributes, {
-        a_pos: { size: 3, type: gl.FLOAT },
-        a_normal: { size: 3, type: gl.FLOAT },
-        a_texCoord: { size: 2, type: gl.FLOAT },
-    }),
-    glance.createAttributeBuffer(gl, "block_2x2-abo", tetrisBlockInfo[4].attributes, {
-        a_pos: { size: 3, type: gl.FLOAT },
-        a_normal: { size: 3, type: gl.FLOAT },
-        a_texCoord: { size: 2, type: gl.FLOAT },
-    }),
-    glance.createAttributeBuffer(gl, "block_t-abo", tetrisBlockInfo[5].attributes, {
-        a_pos: { size: 3, type: gl.FLOAT },
-        a_normal: { size: 3, type: gl.FLOAT },
-        a_texCoord: { size: 2, type: gl.FLOAT },
-    }),
-    glance.createAttributeBuffer(gl, "block_4x1-abo", tetrisBlockInfo[6].attributes, {
-        a_pos: { size: 3, type: gl.FLOAT },
-        a_normal: { size: 3, type: gl.FLOAT },
-        a_texCoord: { size: 2, type: gl.FLOAT },
-    })
-]
+let blockABO = glance.createAttributeBuffer(gl, "block-abo", blockInfo.attributes, {
+    a_pos: { size: 3, type: gl.FLOAT },
+    a_normal: { size: 3, type: gl.FLOAT },
+    a_texCoord: { size: 2, type: gl.FLOAT },
+});
 
 const maxtotalBlockCount = 7000;
 
-const blockInstanceAttributes = [
-    new Float32Array(maxtotalBlockCount / 7 * 26), // 16 + 9 + 1
-    new Float32Array(maxtotalBlockCount / 7 * 26),
-    new Float32Array(maxtotalBlockCount / 7 * 26),
-    new Float32Array(maxtotalBlockCount / 7 * 26),
-    new Float32Array(maxtotalBlockCount / 7 * 26),
-    new Float32Array(maxtotalBlockCount / 7 * 26),
-    new Float32Array(maxtotalBlockCount / 7 * 26),
-]
+const blockInstanceAttributes = new Float32Array(maxtotalBlockCount * 28);  // 16 + 9 + 1 + 1 + 1
 
-const block_z_IABO = glance.createAttributeBuffer(gl, "block_z-iabo", blockInstanceAttributes[0], {
+const blockIABO = glance.createAttributeBuffer(gl, "block-iabo", blockInstanceAttributes, {
     a_modelMatrix: { size: 4, width: 4, type: gl.FLOAT, divisor: 1 },
     a_normalMatrix: { size: 3, width: 3, type: gl.FLOAT, divisor: 1 },
-    a_alpha: { size: 1, width: 1, type: gl.FLOAT, divisor: 1 }
+    a_alpha: { size: 1, width: 1, type: gl.FLOAT, divisor: 1 },
+    a_visible: { size: 1, width: 1, type: gl.FLOAT, divisor: 1 },
+    a_cleared: { size: 1, width: 1, type: gl.FLOAT, divisor: 1 }
 });
 
-const block_s_IABO = glance.createAttributeBuffer(gl, "block_s-iabo", blockInstanceAttributes[0], {
-    a_modelMatrix: { size: 4, width: 4, type: gl.FLOAT, divisor: 1 },
-    a_normalMatrix: { size: 3, width: 3, type: gl.FLOAT, divisor: 1 },
-    a_alpha: { size: 1, width: 1, type: gl.FLOAT, divisor: 1 }
-});
-
-const block_l_IABO = glance.createAttributeBuffer(gl, "block_l-iabo", blockInstanceAttributes[0], {
-    a_modelMatrix: { size: 4, width: 4, type: gl.FLOAT, divisor: 1 },
-    a_normalMatrix: { size: 3, width: 3, type: gl.FLOAT, divisor: 1 },
-    a_alpha: { size: 1, width: 1, type: gl.FLOAT, divisor: 1 }
-});
-
-const block_rev_l_IABO = glance.createAttributeBuffer(gl, "block_rev_l-iabo", blockInstanceAttributes[0], {
-    a_modelMatrix: { size: 4, width: 4, type: gl.FLOAT, divisor: 1 },
-    a_normalMatrix: { size: 3, width: 3, type: gl.FLOAT, divisor: 1 },
-    a_alpha: { size: 1, width: 1, type: gl.FLOAT, divisor: 1 }
-});
-
-const block_2x2_IABO = glance.createAttributeBuffer(gl, "block_2x2-iabo", blockInstanceAttributes[0], {
-    a_modelMatrix: { size: 4, width: 4, type: gl.FLOAT, divisor: 1 },
-    a_normalMatrix: { size: 3, width: 3, type: gl.FLOAT, divisor: 1 },
-    a_alpha: { size: 1, width: 1, type: gl.FLOAT, divisor: 1 }
-});
-
-const block_t_IABO = glance.createAttributeBuffer(gl, "block_t-iabo", blockInstanceAttributes[0], {
-    a_modelMatrix: { size: 4, width: 4, type: gl.FLOAT, divisor: 1 },
-    a_normalMatrix: { size: 3, width: 3, type: gl.FLOAT, divisor: 1 },
-    a_alpha: { size: 1, width: 1, type: gl.FLOAT, divisor: 1 }
-});
-
-const block_4x1_IABO = glance.createAttributeBuffer(gl, "block_4x1-iabo", blockInstanceAttributes[0], {
-    a_modelMatrix: { size: 4, width: 4, type: gl.FLOAT, divisor: 1 },
-    a_normalMatrix: { size: 3, width: 3, type: gl.FLOAT, divisor: 1 },
-    a_alpha: { size: 1, width: 1, type: gl.FLOAT, divisor: 1 }
-});
-
-const blockIABOs = [
-    block_z_IABO,
-    block_s_IABO,
-    block_l_IABO,
-    block_rev_l_IABO,
-    block_2x2_IABO,
-    block_t_IABO,
-    block_4x1_IABO,
-]
-
-const block_z_VAO = glance.createVAO(
+const blockVAO = glance.createVAO(
     gl,
-    "block_z-vao",
-    blockIBOs[0],
+    "block-vao",
+    blockIBO,
     glance.combineAttributeMaps(
-        glance.buildAttributeMap(blockShader, blockABOs[0]),
-        glance.buildAttributeMap(blockShader, blockIABOs[0]),
+        glance.buildAttributeMap(blockShader, blockABO),
+        glance.buildAttributeMap(blockShader, blockIABO),
     )
 )
-const block_s_VAO = glance.createVAO(
-    gl,
-    "block_s-vao",
-    blockIBOs[1],
-    glance.combineAttributeMaps(
-        glance.buildAttributeMap(blockShader, blockABOs[1]),
-        glance.buildAttributeMap(blockShader, blockIABOs[1]),
-    )
-)
-
-const block_l_VAO = glance.createVAO(
-    gl,
-    "block_l-vao",
-    blockIBOs[2],
-    glance.combineAttributeMaps(
-        glance.buildAttributeMap(blockShader, blockABOs[2]),
-        glance.buildAttributeMap(blockShader, blockIABOs[2]),
-    )
-)
-const block_rev_l_VAO = glance.createVAO(
-    gl,
-    "block_rev_l-vao",
-    blockIBOs[3],
-    glance.combineAttributeMaps(
-        glance.buildAttributeMap(blockShader, blockABOs[3]),
-        glance.buildAttributeMap(blockShader, blockIABOs[3]),
-    )
-)
-const block_2x2_VAO = glance.createVAO(
-    gl,
-    "block_2x2-vao",
-    blockIBOs[4],
-    glance.combineAttributeMaps(
-        glance.buildAttributeMap(blockShader, blockABOs[4]),
-        glance.buildAttributeMap(blockShader, blockIABOs[4]),
-    )
-)
-const block_t_VAO = glance.createVAO(
-    gl,
-    "block_t-vao",
-    blockIBOs[5],
-    glance.combineAttributeMaps(
-        glance.buildAttributeMap(blockShader, blockABOs[5]),
-        glance.buildAttributeMap(blockShader, blockIABOs[5]),
-    )
-)
-const block_4x1_VAO = glance.createVAO(
-    gl,
-    "block_4x1-vao",
-    blockIBOs[6],
-    glance.combineAttributeMaps(
-        glance.buildAttributeMap(blockShader, blockABOs[6]),
-        glance.buildAttributeMap(blockShader, blockIABOs[6]),
-    )
-)
-const blockVAOs = [
-    block_z_VAO,
-    block_s_VAO,
-    block_l_VAO,
-    block_rev_l_VAO,
-    block_2x2_VAO,
-    block_t_VAO,
-    block_4x1_VAO
-]
 
 const blockTextureAmbient = await glance.loadTextureNow(gl, "/img/block_ambient.png")
 const blockTextureDiffuse = await glance.loadTextureNow(gl, "./img/block_diffuse.png")
 const blockTextureSpecular = await glance.loadTextureNow(gl, "./img/block_specular.png")
 
-// Spawn a new block when a certain condition is fulfilled
-function spawnNewBlock() {
-    blockOffset = [0, 0, 0]
-    const newBlock = generateRandomBlock();
-
-    // // Create buffers and VAO for the new block
-    // const newBlockBuffer = {
-    //     ibo: glance.createIndexBuffer(gl, newBlock.indices),
-    //     abo: glance.createAttributeBuffer(gl, "block-abo", newBlock.attributes, {
-    //         a_pos: { size: 3, type: gl.FLOAT },
-    //         a_normal: { size: 3, type: gl.FLOAT },
-    //         a_texCoord: { size: 2, type: gl.FLOAT },
-    //     })
-    // };
-
-    // newBlockVAO = glance.createVAO(
-    //     gl,
-    //     "block-vao",
-    //     newBlockBuffer.ibo,
-    //     glance.combineAttributeMaps(
-    //         glance.buildAttributeMap(blockShader, newBlockBuffer.abo),
-    //         glance.buildAttributeMap(blockShader, blockIABO),
-    //     )
-    // );
 
 
-    // Store the new block and its associated buffers and VAO
-    // blocks.push({
-    //     buffer: newBlockBuffer,
-    //     vao: newBlockVAO
-    // });
-    // Increment the block count
-    //totalBlockCount++;
-}
 
-// Skybox
+// #endregion
+
+// #region Sky Shader Components
 
 const skyShader = glance.buildShaderProgram(gl, "sky-shader", skyVertexShaderSource, skyFragmentShaderSource, {
     u_projectionMatrix: projectionMatrix,
@@ -829,9 +657,11 @@ const skyCubemap = await glance.loadCubemapNow(gl, "sky-texture", [
     "./CloudyCrown_Sunset_Back.png",
 ], { flipY: false })
 
-// Playfield 1
+// #endregion
 
-const playfieldShader = glance.buildShaderProgram(gl, "playfield-shader", instancedPhongVertexShader, phongFragmentShader, {
+// #region Playfield Shader Components
+
+const playfieldShader = glance.buildShaderProgram(gl, "playfield-shader", instancedPhongVertexShaderField, phongFragmentShader, {
     u_ambient: 0.1,
     u_specular: 0.6,
     u_shininess: 64,
@@ -856,11 +686,13 @@ const playfieldABO = glance.createAttributeBuffer(gl, "playfield-abo", playfield
 const playfieldCount = 2;
 
 
-const playfieldInstanceAttributes = new Float32Array(playfieldCount * 26); // 16 + 9 + 1
+const playfieldInstanceAttributes = new Float32Array(playfieldCount * 28); // 16 + 9 + 1 + 1
 const playfieldIABO = glance.createAttributeBuffer(gl, "playfield-iabo", playfieldInstanceAttributes, {
     a_modelMatrix: { size: 4, width: 4, type: gl.FLOAT, divisor: 1 },
     a_normalMatrix: { size: 3, width: 3, type: gl.FLOAT, divisor: 1 },
-    a_alpha: { size: 1, width: 1, type: gl.FLOAT, divisor: 1 }
+    a_alpha: { size: 1, width: 1, type: gl.FLOAT, divisor: 1 },
+    a_visible: { size: 1, width: 1, type: gl.FLOAT, divisor: 1 },
+    a_cleared: { size: 1, width: 1, type: gl.FLOAT, divisor: 1 }
 });
 
 const playfieldVAO = glance.createVAO(
@@ -873,73 +705,130 @@ const playfieldVAO = glance.createVAO(
     ),
 )
 
-var blockPivot = [-1.5, 0, 0.5]
-var blockSpawn = [0, 6, 0]
+// #endregion
+
+// #region Block Instance Update
+
+let cleared = 0;
+var blockSpawn = [-1.5, 12, 0]
 var blockOffset = [0, 0, 0]
 let firstFieldActive = true;
 let timesPressed = 0;
 let timesRotated = 0;
 let xMove = [1, 0, 0]
 let yMove = [0, 1, 0]
+let rPressed = false;
 
-function updateBlockInstanceAttributes(time) {
-    let shapeIdx = getCurrentShape();
-    switch (shapeIdx) {
-        case 0:
-            blockSpawn = [-.5, 7, 0]
-            break;
-        case 1:
-            blockSpawn = [-.5, 7, 0]
-            break;
-        case 4:
-            blockSpawn = [-.5, 7, 0]
-            break;
-        case 2:
-            blockSpawn = [0, 7.5, 0]
-            break;
-        case 3:
-            blockSpawn = [0, 7.5, 0]
-            break;
-        case 5:
-            blockSpawn = [0, 7.5, 0]
-            break;
-        case 6:
-            blockSpawn = [.5, 6.5, 0]
-            break;
-    }
-    for (let i = 0; i < individualBlockCount[shapeIdx]; i++) {
-        if (i == individualBlockCount[shapeIdx] - 1) {
-            const modelMatrix = mat4.identity();
+function updateBlockInstanceAttributes(blocksToRemove) {
 
-            //console.log(blockInstanceAttributes)
-            //const modelMatrix = blockInstanceAttributes.slice(0, 16);
-            //console.log(modelMatrix)
-            var angleY = timesPressed * (Math.PI / 2);  // Rotation to match current playfield.
-            var angleZ = timesRotated * (Math.PI / 2);
-
-            mat4.rotate(modelMatrix, angleY, [0, 1, 0]);
-            mat4.translate(modelMatrix, blockOffset);
-            // mat4.translate(modelMatrix, blockOffset);
-            mat4.translate(modelMatrix, blockSpawn);
-            mat4.rotate(modelMatrix, -angleZ, [0, 0, 1]);
-
-            //console.log(xMove)
-
-            const arrayOffset = i * 26;
-            blockInstanceAttributes[shapeIdx].set(modelMatrix, arrayOffset);
-            const normalMatrix = mat3.fromMat4(mat4.transpose(mat4.invert(modelMatrix)));
-            blockInstanceAttributes[shapeIdx].set(normalMatrix, arrayOffset + 16);
-            blockInstanceAttributes[shapeIdx].set([0], arrayOffset + 25);
+    if (blocksToRemove) {
+        cleared += blocksToRemove[1]
+        console.log("REMOOOOOOVED:    ", blocksToRemove)
+        for (let i = 0; i < blocksToRemove[0].length; i++) {
+            let arrayOffset = blocksToRemove[0][i] * 28;
+            blockInstanceAttributes.set([2.0], arrayOffset + 26);
         }
+        for (let i = 0; i < currentBlockIndex; i++) {
+            blockInstanceAttributes.set(cleared * 1.0, i * 27);
+        }
+    }
+
+    for (let i = lastBlockIndex; i < currentBlockIndex; i++) {
+        var modelMatrix = mat4.identity();
+
+        var angleY = timesPressed * (Math.PI / 2);  // Rotation to match current playfield.
+        var angleZ = timesRotated * (Math.PI / 2);  // Arrow up rotation
+        //console.log(currentBlock)
+
+        mat4.rotate(modelMatrix, angleY, [0, 1, 0]);  // Rotate around Y axis
+        mat4.translate(modelMatrix, blockSpawn);  // And then set to correct start position.
+
+        mat4.translate(modelMatrix, blockOffset)
+
+        // Change block rotation pivot
+        switch (getCurrentShapeIndex()) {
+            case 0:  // Z Block
+                mat4.translate(modelMatrix, [1.5, 1.5, 0])
+                angleZ = (timesRotated % 2) * (Math.PI / 2);
+                mat4.rotate(modelMatrix, angleZ, [0, 0, 1]);
+                mat4.translate(modelMatrix, [-1.5, -1.5, 0]);
+                break;
+            case 1:  // S Block
+                mat4.translate(modelMatrix, [1.5, 1.5, 0])
+                angleZ = (timesRotated % 2) * (Math.PI / 2);
+                mat4.rotate(modelMatrix, angleZ, [0, 0, 1]);
+                mat4.translate(modelMatrix, [-1.5, -1.5, 0])
+                break;
+
+            case 2:  // L Block
+                mat4.translate(modelMatrix, [1.5, 1.5, 0])
+                mat4.rotate(modelMatrix, angleZ, [0, 0, 1]);
+                mat4.translate(modelMatrix, [-1.5, -1.5, 0])
+                break;
+            case 3:  // Rev L Block
+                mat4.translate(modelMatrix, [1.5, 1.5, 0])
+                mat4.rotate(modelMatrix, angleZ, [0, 0, 1]);
+                mat4.translate(modelMatrix, [-1.5, -1.5, 0])
+                break;
+            case 4:  // 2x2 Block
+                break;
+            case 5:  // T Block
+                mat4.translate(modelMatrix, [1.5, 1.5, 0])
+                mat4.rotate(modelMatrix, angleZ, [0, 0, 1]);
+                mat4.translate(modelMatrix, [-1.5, -1.5, 0])
+
+                break;
+            case 6:  // 4x1 Block
+                mat4.translate(modelMatrix, [1.5, .5, 0])
+                angleZ = (timesRotated % 2) * (Math.PI / 2);
+                mat4.rotate(modelMatrix, angleZ, [0, 0, 1]);
+                mat4.translate(modelMatrix, [-1.5, -.5, 0])
+
+                break;
+        }
+
+        let offset = blockComponentOffsets[i - lastBlockIndex]
+        mat4.translate(modelMatrix, offset)
+
+
+        const arrayOffset = i * 28;
+        blockInstanceAttributes.set(modelMatrix, arrayOffset);
+        const normalMatrix = mat3.fromMat4(mat4.transpose(mat4.invert(modelMatrix)));
+        blockInstanceAttributes.set(normalMatrix, arrayOffset + 16);
+        // blockInstanceAttributes.set([alpha * (i - lastBlockIndex)], arrayOffset + 25);  // DEBUG
+
         //blockDrawCall.vao = blockVAOs[currentShape];
     }
+    let alpha = 1.0;
+    if (blocks[0]) {
+        for (let i = 0; i < blocks.length; i++) {
+            for (let j = blocks[i].startIndex; j < blocks[i].startIndex + 4; j++) {
+                const arrayOffset = j * 28;
 
-    switch (shapeIdx) {
-        case 0:
-            console.log(blockIABOs[shapeIdx])
-            gl.bindBuffer(gl.ARRAY_BUFFER, blockIABOs[shapeIdx].glObject);
-            gl.bufferData(gl.ARRAY_BUFFER, blockInstanceAttributes[shapeIdx], gl.DYNAMIC_DRAW);
-            break;
+                if (blocks[i].location[2] == 0 && firstFieldActive) {
+                    alpha = 1.0;
+                    //console.log(alpha)
+                }
+                if (blocks[i].location[2] == 0 && !firstFieldActive) {
+                    alpha = 0.2;
+                }
+                if (blocks[i].location[2] == 1 && !firstFieldActive) {
+                    alpha = 1.0;
+                }
+                if (blocks[i].location[2] == 1 && firstFieldActive) {
+                    alpha = 0.2;
+                }
+                blockInstanceAttributes.set([alpha], arrayOffset + 25);
+            }
+        }
+    }
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, blockIABO.glObject);
+    gl.bufferData(gl.ARRAY_BUFFER, blockInstanceAttributes, gl.DYNAMIC_DRAW);
+
+    if (rPressed) {
+        console.log(gameField._boards)
+        rPressed = false;
     }
     //gl.bindBuffer(gl.ARRAY_BUFFER, blockIABOs[shapeIdx].glObject);
     //gl.bufferData(gl.ARRAY_BUFFER, blockInstanceAttributes[shapeIdx], gl.DYNAMIC_DRAW);
@@ -947,11 +836,15 @@ function updateBlockInstanceAttributes(time) {
 
 }
 
+// #endregion
+
+// #region Playfield Instance Update
+
 function updatePlayfieldInstanceAttributes() {
     for (let i = 0; i < playfieldCount; i++) {
         const modelMatrix = mat4.identity();
 
-        mat4.translate(modelMatrix, [0, -6, 0])
+        mat4.translate(modelMatrix, [0, 0, 0])
 
         mat4.rotate(modelMatrix, i * (Math.PI / playfieldCount), [0, 1, 0])
 
@@ -980,13 +873,16 @@ function updatePlayfieldInstanceAttributes() {
 
 }
 
-// Draw Calls /////////////////////////////////////////////////////////////////////
+// #endregion
+
+// #region Draw Calls
 
 // Scene State
 var targetViewDist = 22;
-var targetViewPan = -0.5;
-var targetViewTilt = -0.25;
+var targetViewPan = 0;
+var targetViewTilt = 0.25;
 
+let viewHeight = 6;
 let viewDist = 22
 let viewPan = 0
 let viewTilt = 0
@@ -1001,170 +897,28 @@ const viewRotationMatrix = new glance.Cached(
         )
 );
 
-const block_z_drawCall = glance.createDrawCall(
+const blockDrawCall = glance.createDrawCall(
     gl,
     blockShader,
-    block_z_VAO,
+    blockVAO,
     {
         uniforms: {
             u_viewMatrix: () => mat4.invert(mat4.multiply(mat4.multiply(
                 mat4.multiply(mat4.identity(), mat4.fromRotation(viewPan, [0, 1, 0])),
                 mat4.fromRotation(viewTilt, [1, 0, 0])
-            ), mat4.fromTranslation([0, 0, viewDist])))
+            ), mat4.fromTranslation([0, viewHeight, viewDist])))
         },
         textures: [
             [0, blockTextureAmbient],
             [1, blockTextureDiffuse],
             [2, blockTextureSpecular],
         ],
-        cullFace: gl.BACK,
-        depthTest: gl.LEQUAL,
+        cullFace: gl.NONE,
+        depthTest: gl.LESS,
         instanceCount: maxtotalBlockCount,
     },
 )
 
-const block_s_drawCall = glance.createDrawCall(
-    gl,
-    blockShader,
-    blockVAOs[1],
-    {
-        uniforms: {
-            u_viewMatrix: () => mat4.invert(mat4.multiply(mat4.multiply(
-                mat4.multiply(mat4.identity(), mat4.fromRotation(viewPan, [0, 1, 0])),
-                mat4.fromRotation(viewTilt, [1, 0, 0])
-            ), mat4.fromTranslation([0, 0, viewDist])))
-        },
-        textures: [
-            [0, blockTextureAmbient],
-            [1, blockTextureDiffuse],
-            [2, blockTextureSpecular],
-        ],
-        cullFace: gl.BACK,
-        depthTest: gl.LEQUAL,
-        instanceCount: maxtotalBlockCount,
-    },
-)
-
-const block_l_drawCall = glance.createDrawCall(
-    gl,
-    blockShader,
-    blockVAOs[2],
-    {
-        uniforms: {
-            u_viewMatrix: () => mat4.invert(mat4.multiply(mat4.multiply(
-                mat4.multiply(mat4.identity(), mat4.fromRotation(viewPan, [0, 1, 0])),
-                mat4.fromRotation(viewTilt, [1, 0, 0])
-            ), mat4.fromTranslation([0, 0, viewDist])))
-        },
-        textures: [
-            [0, blockTextureAmbient],
-            [1, blockTextureDiffuse],
-            [2, blockTextureSpecular],
-        ],
-        cullFace: gl.BACK,
-        depthTest: gl.LEQUAL,
-        instanceCount: maxtotalBlockCount,
-    },
-)
-
-const block_rev_l_drawCall = glance.createDrawCall(
-    gl,
-    blockShader,
-    blockVAOs[3],
-    {
-        uniforms: {
-            u_viewMatrix: () => mat4.invert(mat4.multiply(mat4.multiply(
-                mat4.multiply(mat4.identity(), mat4.fromRotation(viewPan, [0, 1, 0])),
-                mat4.fromRotation(viewTilt, [1, 0, 0])
-            ), mat4.fromTranslation([0, 0, viewDist])))
-        },
-        textures: [
-            [0, blockTextureAmbient],
-            [1, blockTextureDiffuse],
-            [2, blockTextureSpecular],
-        ],
-        cullFace: gl.BACK,
-        depthTest: gl.LEQUAL,
-        instanceCount: maxtotalBlockCount,
-    },
-)
-
-const block_2x2_drawCall = glance.createDrawCall(
-    gl,
-    blockShader,
-    blockVAOs[4],
-    {
-        uniforms: {
-            u_viewMatrix: () => mat4.invert(mat4.multiply(mat4.multiply(
-                mat4.multiply(mat4.identity(), mat4.fromRotation(viewPan, [0, 1, 0])),
-                mat4.fromRotation(viewTilt, [1, 0, 0])
-            ), mat4.fromTranslation([0, 0, viewDist])))
-        },
-        textures: [
-            [0, blockTextureAmbient],
-            [1, blockTextureDiffuse],
-            [2, blockTextureSpecular],
-        ],
-        cullFace: gl.BACK,
-        depthTest: gl.LEQUAL,
-        instanceCount: maxtotalBlockCount,
-    },
-)
-
-const block_t_drawCall = glance.createDrawCall(
-    gl,
-    blockShader,
-    blockVAOs[5],
-    {
-        uniforms: {
-            u_viewMatrix: () => mat4.invert(mat4.multiply(mat4.multiply(
-                mat4.multiply(mat4.identity(), mat4.fromRotation(viewPan, [0, 1, 0])),
-                mat4.fromRotation(viewTilt, [1, 0, 0])
-            ), mat4.fromTranslation([0, 0, viewDist])))
-        },
-        textures: [
-            [0, blockTextureAmbient],
-            [1, blockTextureDiffuse],
-            [2, blockTextureSpecular],
-        ],
-        cullFace: gl.BACK,
-        depthTest: gl.LEQUAL,
-        instanceCount: maxtotalBlockCount,
-    },
-)
-
-const block_4x1_drawCall = glance.createDrawCall(
-    gl,
-    blockShader,
-    blockVAOs[6],
-    {
-        uniforms: {
-            u_viewMatrix: () => mat4.invert(mat4.multiply(mat4.multiply(
-                mat4.multiply(mat4.identity(), mat4.fromRotation(viewPan, [0, 1, 0])),
-                mat4.fromRotation(viewTilt, [1, 0, 0])
-            ), mat4.fromTranslation([0, 0, viewDist])))
-        },
-        textures: [
-            [0, blockTextureAmbient],
-            [1, blockTextureDiffuse],
-            [2, blockTextureSpecular],
-        ],
-        cullFace: gl.BACK,
-        depthTest: gl.LEQUAL,
-        instanceCount: maxtotalBlockCount,
-    },
-)
-
-const blockDrawCalls = [
-    block_z_drawCall,
-    block_s_drawCall,
-    block_l_drawCall,
-    block_rev_l_drawCall,
-    block_2x2_drawCall,
-    block_t_drawCall,
-    block_4x1_drawCall
-
-]
 const skyDrawCall = glance.createDrawCall(
     gl,
     skyShader,
@@ -1197,7 +951,7 @@ const playfieldDrawCall = glance.createDrawCall(
             u_viewMatrix: () => mat4.invert(mat4.multiply(mat4.multiply(
                 mat4.multiply(mat4.identity(), mat4.fromRotation(viewPan, [0, 1, 0])),
                 mat4.fromRotation(viewTilt, [1, 0, 0])
-            ), mat4.fromTranslation([0, 0, viewDist]))),
+            ), mat4.fromTranslation([0, viewHeight, viewDist]))),
         },
         textures: [],
         cullFace: gl.BACK,
@@ -1207,6 +961,9 @@ const playfieldDrawCall = glance.createDrawCall(
     },
 )
 
+// #endregion
+
+// #region Renderloop
 
 let lastTime = 0;
 
@@ -1235,41 +992,21 @@ setRenderLoop((time) => {
     // }
     // Render all existing blocks
     updatePlayfieldInstanceAttributes();
-    updateBlockInstanceAttributes(time);
+    updateBlockInstanceAttributes();
     rotateAnimation(time)
     //console.log(blockABO.attributes.set("a_pos", [0, 1, 5]))
     viewRotationMatrix.setDirty();
+
     glance.performDrawCall(gl, skyDrawCall, time);
 
-    switch (getCurrentShape()) {
-        case 0:
-            glance.performDrawCall(gl, block_z_drawCall, time)
-            break;
-        case 1:
-            glance.performDrawCall(gl, block_s_drawCall, time)
-            break;
-        case 2:
-            glance.performDrawCall(gl, block_l_drawCall, time)
-            break;
-        case 3:
-            glance.performDrawCall(gl, block_rev_l_drawCall, time)
-            break;
-        case 4:
-            glance.performDrawCall(gl, block_2x2_drawCall, time)
-            break;
-        case 5:
-            glance.performDrawCall(gl, block_t_drawCall, time)
-            break;
-        case 6:
-            glance.performDrawCall(gl, block_4x1_drawCall, time)
-            break;
-        default:
-            break;
-    }
-    blockDrawCalls.forEach((drawCall) => glance.performDrawCall(gl, drawCall, time));
-    //glance.performDrawCall(gl, block_z_drawCall, time)
+    glance.performDrawCall(gl, blockDrawCall, time)
 
     glance.performDrawCall(gl, playfieldDrawCall, time);
+    if (sPressed) {
+        spawnNewBlock();
+        sPressed = false;
+        timesRotated = 0;
+    }
 });
 
 function updateBeginningAnimation(deltaTime) {
@@ -1284,6 +1021,9 @@ function updateBeginningAnimation(deltaTime) {
     viewTilt = lerp(0, targetViewTilt, t);
 }
 
+// #endregion
+
+// #region Animations
 
 function rotateAnimation(time) {
     if (isSpacePressed) {
@@ -1306,8 +1046,6 @@ function rotateAnimation(time) {
             targetViewPan = viewPan;
             firstFieldActive = !firstFieldActive;
             timesPressed = (timesPressed + 1) % 4
-
-
             //rotateActiveBlock();
         }
     }
@@ -1318,6 +1056,10 @@ function lerp(start, end, t) {
     return start * (1 - t) + end * t;
 }
 
+// #endregion
+
+// #region Input
+
 onMouseDrag((e) => {
     viewPan += e.movementX * -.01
     viewTilt += e.movementY * -.01
@@ -1327,34 +1069,58 @@ onMouseWheel((e) => {
     viewDist = Math.max(1.5, Math.min(100, viewDist * (1 + Math.sign(e.deltaY) * 0.2)))
 })
 
-
+let sPressed = false;
 onKeyDown((e) => {
     console.log(e)
     if (e.key == "ArrowLeft") {
-        vec3.subtract(blockOffset, xMove)
+        if (gameField.moveBlockLeft(currentBlock)) vec3.subtract(blockOffset, xMove)
         console.log(blockOffset)
     }
     if (e.key == "ArrowRight") {
-        vec3.add(blockOffset, xMove)
+        if (gameField.moveBlockRight(currentBlock)) vec3.add(blockOffset, xMove)
         console.log(blockOffset)
     }
-    if (e.key == "ArrowUp") {
-        //vec3.rotateZ(xMove, Math.PI/2)
-        //vec3.rotateZ(yMove, Math.PI/2)
-        timesRotated = (timesRotated + 1) % 4;
-    }
+
     if (e.key == "ArrowDown") {
-        vec3.subtract(blockOffset, yMove)
+        if (gameField.moveBlockDown(currentBlock)) vec3.subtract(blockOffset, yMove)
         console.log(blockOffset)
     }
     if (e.key == " ") {
         if (!isSpacePressed) animationStartTime = e.timeStamp;
+        gameField.rotateField(currentBlock);
         vec3.rotateX(xMove, -Math.PI / 2)
         isSpacePressed = true;
+        if ((timesPressed) % 2 == 1) {
+            gameField.mirrorBoard1();
+        }
+        if ((timesPressed) % 2 == 0) {
+            gameField.mirrorBoard2();
+        }
     }
     if (e.key == "Enter") {
         spawnNewBlock();
+        let removed = gameField.clear();
+        if (removed.length > 1) {
+            updateBlockInstanceAttributes(removed);
+        }
         timesRotated = 0;
+    }
+    if (e.key == "y") {
+        let counters = gameField.rotateBlock(currentBlock);
+        vec3.add(blockOffset, [counters[0], 0, 0])
+        vec3.subtract(blockOffset, [counters[1], 0, 0])
+        timesRotated = (timesRotated + 1) % 4;
+
+    }
+    if (e.key == "r") {  // debug button
+        rPressed = true;
+    }
+    if (e.key == "s") {
+        while (gameField.moveBlockDown(currentBlock)) {
+            vec3.subtract(blockOffset, yMove)
+        }
+        sPressed = true;
+
     }
 })
 
@@ -1372,3 +1138,5 @@ onKeyUp((e) => {
 
     }
 })
+
+// #endregion
